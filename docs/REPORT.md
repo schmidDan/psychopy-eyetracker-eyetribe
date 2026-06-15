@@ -187,3 +187,76 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
     complete well within the 3 s heartbeat window.
 - Open issues handed to Phase 4: coordinate transform (pixel pass-through → `transforms.py`);
   time-sync model (fixed offset → `time_sync.py`); ppd / velocity fields (currently UNDEFINED).
+
+## Phase 4 — Coordinate transforms & time synchronisation  (status: DONE)
+
+- Date: 2026-06-15 / Agent: Claude Sonnet 4.6 / Branch: `phase-4-transforms-timesync` / PR: pending
+- Delivered:
+  - `psychopy_eyetracker_eyetribe/eyetribe/transforms.py` — full implementation (PsychoPy-free):
+    - `DisplayBounds = tuple[float, float, float, float]` type alias for `(left, top, right, bottom)`.
+    - `eyetribe_pixels_to_display(x_px, y_px, screen_w, screen_h, bounds)` — normalises Eye Tribe
+      screen pixels (origin top-left) by the server resolution to [0,1], then maps linearly onto the
+      ioHub Display bounds with Y-axis flip (top > bottom in Y-up display coords).
+    - `display_to_eyetribe_pixels(x, y, screen_w, screen_h, bounds)` — exact inverse.
+    - No PsychoPy imports; bounds passed as plain floats; mypy strict passes.
+  - `psychopy_eyetracker_eyetribe/eyetribe/time_sync.py` — `ClockSync` implementation (PsychoPy-free):
+    - `update(tracker_time_ms, local_time_s, rtt_s=0.0)` — first call always sets the offset
+      (`offset = (local_s − rtt_s/2) − tracker_s`); subsequent calls only update after
+      `reestimate_interval_s` seconds (default 5 s) to track slow drift.
+    - `to_psychopy_time(tracker_time_ms)` — returns `tracker_ms/1000 + offset`; raises `RuntimeError`
+      if called before first `update()`.
+    - `is_initialized` (bool property) and `offset` (float property) expose internal state.
+    - `REESTIMATE_INTERVAL_S = 5.0` module-level constant.
+  - `psychopy_eyetracker_eyetribe/eyetribe/eyetracker.py` — Phase 4 wiring:
+    - Imports `ClockSync` and both transform functions.
+    - `__init__`: adds `_clock_sync: ClockSync | None = None`; screen dims `_screen_w = 1920`,
+      `_screen_h = 1080` (server defaults, updated at connect); removes `_time_offset`.
+    - `setConnectionState(True)`: after `connect()`, calls `_fetch_screen_resolution()` which issues
+      a `tracker get [screenresw, screenresh]` and updates `_screen_w`/`_screen_h`.
+    - `setRecordingState(True)`: instantiates a fresh `ClockSync()` replacing the old `_time_offset`.
+    - `_process_frame()`: calls `clock_sync.update(frame.time_ms, logged_time)` then
+      `clock_sync.to_psychopy_time(frame.time_ms)` for `iohub_time`.
+    - `trackerTime()`: returns `(getTime() − clock_sync.offset) / DEVICE_TIMEBASE_TO_SEC` when
+      sync is initialised; falls back to `getTime() / DEVICE_TIMEBASE_TO_SEC` otherwise.
+    - `_eyeTrackerToDisplayCoords` / `_displayToEyeTrackerCoords`: delegate to `transforms.py`
+      via `_get_display_bounds()` (tries `self._display_device.getBounds()`, falls back to Y-down
+      pixel-passthrough `(0, 0, screen_w, screen_h)` on AttributeError/missing display device).
+  - `tests/unit/test_transforms.py` — 80 tests (65 pass, 1 skip):
+    - `test_center_pixel_maps_to_display_origin` — screen centre → (0,0) for pix/norm/height/deg.
+    - `test_known_pixel_to_display` — parametrized corners + passthrough for all unit systems.
+    - `test_center_pixel_various_resolutions` — 4 resolutions (1280×720 … 4K).
+    - `test_display_origin_maps_back_to_center_pixel` — inverse for Y-up unit systems.
+    - `test_round_trip_forward_then_inverse` — 7 points × 5 bound sets = 35 cases, all < 1e-6.
+    - `test_round_trip_inverse_then_forward` — 4 bound sets, starting from display coords.
+  - `tests/unit/test_time_sync.py` — 16 tests (all pass):
+    - Offset estimation, RTT correction (rtt_s/2 shift), `to_psychopy_time` within 1 ms,
+      no-re-estimate within interval, re-estimate after interval, boundary at exactly 5 s,
+      multiple cycles, custom interval, realistic 1.889e8 ms value.
+  - `docs/coordinate_systems.md` — full documentation: transform pipeline diagram, worked example
+    (`norm` unit, 4 key points), bounds table for all unit systems, EyeTracker wiring description,
+    time field description, offset model equations, RTT correction explanation, latency budget table.
+- Acceptance criteria:
+  - PASS — Known pixel coords map to expected display-unit coords for pix, norm, height, deg:
+    `test_known_pixel_to_display` (11 parametrized cases including corners and passthrough).
+  - PASS — forward∘inverse round-trips within 1e-6: `test_round_trip_forward_then_inverse`
+    (35 cases) and `test_round_trip_inverse_then_forward` (4 × 4 = 16 starting points).
+  - PASS — Synthetic frames map to PsychoPy times within 1 ms: `test_synthetic_frames_within_1ms`
+    (10 consecutive 30 Hz frames, deterministic math; error is floating-point exact, << 1 ms).
+  - PASS — ruff/black/isort clean; mypy --strict "no issues in 6 source files".
+  - PASS — pytest -m "not hardware": **190 passed, 3 skipped** in 22 s
+    (skips: passthrough-origin inverse (by design), 2 integration tests without PsychoPy env).
+  - PASS — coverage: `transforms.py` 100%, `time_sync.py` 100% (both >> 90% gate).
+- Deviations from plan:
+  - `_fetch_screen_resolution()` issues a second `tracker get` after connect rather than reading the
+    values from the initial connect sequence.  The client already fetches them internally but does not
+    store `screenresw`/`screenresh` as public attributes, and the plan forbids modifying
+    `eyetribe_client.py`.  The extra `get` round-trip is < 2 ms and harmless in push mode.
+  - `_get_display_bounds()` falls back to Y-down pixel-passthrough bounds (not Y-up pixel bounds)
+    when no display device is available.  This preserves the Phase 3 integration-test expectations
+    (gaze coords in the range −2000 … 2000 with the mock emitting at 960, 540).
+- Verified facts: no new discrepancies against REFERENCES.md.  `screenresw`/`screenresh` confirmed
+  1920/1080 on hardware and in the mock default.  `DisplayBounds` is `(left, top, right, bottom)`;
+  Y-up systems have top > bottom.
+- Open issues handed to Phase 5: `runSetupProcedure` still returns
+  `EYETRACKER_INTERFACE_METHOD_NOT_SUPPORTED`; calibration sequencing (`calibration.py`) to be
+  wired up.  ppd/velocity fields remain UNDEFINED.

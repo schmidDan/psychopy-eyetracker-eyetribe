@@ -2,8 +2,8 @@
 """Eye Tribe ioHub EyeTracker device (Common Eye Tracker Interface).
 
 Phase 3: recording, polling, and BinocularEyeSampleEvent / fixation-event generation.
-Phase 4 will replace the interim coordinate pass-through and fixed-offset time-sync
-with transforms.py and time_sync.py.  Phase 5 adds PsychoPy-driven calibration.
+Phase 4: coordinate transforms via transforms.py; clock-offset model via time_sync.py.
+Phase 5 will add PsychoPy-driven calibration.
 """
 
 from __future__ import annotations
@@ -17,6 +17,8 @@ from psychopy.iohub.devices.eyetracker import EyeTrackerDevice
 
 from .eyetribe_client import STATE_CONNECTED, EyeTribeClient
 from .frames import Frame, FrameParseError, parse_frame
+from .time_sync import ClockSync
+from .transforms import DisplayBounds, display_to_eyetribe_pixels, eyetribe_pixels_to_display
 
 log = logging.getLogger(__name__)
 
@@ -44,8 +46,11 @@ class EyeTracker(EyeTrackerDevice):
         self._gaze_source: str = config.get("gaze_source", "raw")
         self._client = EyeTribeClient(host=host, port=port)
         self._recording = False
-        # interim time-sync: PsychoPy_time = frame.time_ms * DEVICE_TIMEBASE_TO_SEC + _time_offset
-        self._time_offset: float = 0.0
+        # Phase 4: ClockSync instance (created fresh at each recording start)
+        self._clock_sync: ClockSync | None = None
+        # Server-reported screen resolution (updated from server at connect)
+        self._screen_w: int = 1920
+        self._screen_h: int = 1080
         # fixation state tracking
         self._last_fix: bool = False
         self._fix_start_time: float = 0.0
@@ -61,11 +66,31 @@ class EyeTracker(EyeTrackerDevice):
             if self._client.state != STATE_CONNECTED:
                 try:
                     self._client.connect()
+                    self._fetch_screen_resolution()
                 except Exception as exc:
                     log.error("EyeTracker: connect failed: %s", exc)
         else:
             self._client.close()
         return self.isConnected()
+
+    def _fetch_screen_resolution(self) -> None:
+        """Read screenresw / screenresh from the server and cache them."""
+        try:
+            params = self._client.get(["screenresw", "screenresh"])
+            self._screen_w = int(params.get("screenresw", self._screen_w))
+            self._screen_h = int(params.get("screenresh", self._screen_h))
+            log.info(
+                "EyeTracker: screen resolution from server = %dx%d",
+                self._screen_w,
+                self._screen_h,
+            )
+        except Exception as exc:
+            log.warning(
+                "EyeTracker: could not read screen resolution, using defaults (%dx%d): %s",
+                self._screen_w,
+                self._screen_h,
+                exc,
+            )
 
     def isConnected(self) -> bool:
         return self._client.state == STATE_CONNECTED
@@ -76,7 +101,7 @@ class EyeTracker(EyeTrackerDevice):
         current = self.isRecordingEnabled()
         if recording and not current:
             self._recording = True
-            self._time_offset = 0.0  # reset; set on first polled frame
+            self._clock_sync = ClockSync()  # fresh sync at each recording start
             self._last_fix = False
         elif not recording and current:
             self._recording = False
@@ -116,11 +141,12 @@ class EyeTracker(EyeTrackerDevice):
     def _process_frame(self, frame: Frame, logged_time: float) -> None:
         device_time = frame.time_ms * self.DEVICE_TIMEBASE_TO_SEC
 
-        # Interim time-sync: capture offset on first frame of each recording session.
-        # Phase 4 replaces with a proper clock-offset model in time_sync.py.
-        if self._time_offset == 0.0:
-            self._time_offset = logged_time - device_time
-        iohub_time = device_time + self._time_offset
+        # Phase 4: use ClockSync for accurate PsychoPy-timebase conversion.
+        if self._clock_sync is not None:
+            self._clock_sync.update(frame.time_ms, logged_time)
+            iohub_time = self._clock_sync.to_psychopy_time(frame.time_ms)
+        else:
+            iohub_time = logged_time  # should not happen after setRecordingState(True)
 
         status = 0 if frame.is_gaze_valid() else 2
 
@@ -336,34 +362,65 @@ class EyeTracker(EyeTrackerDevice):
 
         self._last_fix = is_fix
 
-    # ── timing (Phase 4 will refine with time_sync.py) ────────────────────────
+    # ── timing ────────────────────────────────────────────────────────────────
 
     def trackerTime(self) -> float:
-        """Return estimated current tracker time (monotonic ms) using last-frame offset."""
-        offset = self._time_offset if self._time_offset != 0.0 else 0.0
-        return (getTime() - offset) / self.DEVICE_TIMEBASE_TO_SEC
+        """Return estimated current tracker time in milliseconds.
+
+        Uses the ClockSync offset when recording has been started at least once
+        (and a frame has arrived).  Falls back to ``getTime() / DEVICE_TIMEBASE_TO_SEC``
+        if the sync has not been initialised yet.
+        """
+        if self._clock_sync is not None and self._clock_sync.is_initialized:
+            # offset = local_s - tracker_s  →  tracker_s = local_s - offset
+            return (getTime() - self._clock_sync.offset) / self.DEVICE_TIMEBASE_TO_SEC
+        return getTime() / self.DEVICE_TIMEBASE_TO_SEC
 
     def trackerSec(self) -> float:
         """Return estimated current tracker time in seconds."""
         return self.trackerTime() * self.DEVICE_TIMEBASE_TO_SEC
 
-    # ── coordinate transforms (Phase 4 will replace with transforms.py) ───────
+    # ── coordinate transforms ─────────────────────────────────────────────────
 
     def _eyeTrackerToDisplayCoords(self, eyetracker_point: Any) -> tuple[float, float]:
+        """Convert Eye Tribe pixel coords to ioHub display coords via transforms.py."""
         gaze_x, gaze_y = float(eyetracker_point[0]), float(eyetracker_point[1])
         try:
-            return self._display_device._pixel2DisplayCoord(
-                gaze_x, gaze_y, self._display_device.getIndex()
+            bounds = self._get_display_bounds()
+            return eyetribe_pixels_to_display(
+                gaze_x, gaze_y, self._screen_w, self._screen_h, bounds
             )
-        except AttributeError:
-            # No display device (e.g. test harness); pass pixel coords through.
+        except Exception:
             return gaze_x, gaze_y
 
     def _displayToEyeTrackerCoords(self, x: float, y: float) -> tuple[float, float]:
+        """Inverse: convert ioHub display coords back to Eye Tribe pixel coords."""
         try:
-            return self._display_device.display2PIxelCoord(x, y, self._display_device.getIndex())
-        except AttributeError:
+            bounds = self._get_display_bounds()
+            return display_to_eyetribe_pixels(x, y, self._screen_w, self._screen_h, bounds)
+        except Exception:
             return x, y
+
+    def _get_display_bounds(self) -> DisplayBounds:
+        """Return ``(left, top, right, bottom)`` in display units from the ioHub Display device.
+
+        Falls back to Y-down pixel passthrough bounds ``(0, 0, screen_w, screen_h)``
+        when no display device is available (e.g. unit-test harness) or when the
+        device does not expose ``getBounds()``.
+        """
+        try:
+            bounds = self._display_device.getBounds()
+            if isinstance(bounds, dict):
+                return (
+                    float(bounds["left"]),
+                    float(bounds["top"]),
+                    float(bounds["right"]),
+                    float(bounds["bottom"]),
+                )
+            return (float(bounds[0]), float(bounds[1]), float(bounds[2]), float(bounds[3]))
+        except (AttributeError, TypeError, KeyError, IndexError):
+            # No display device or unrecognised format — Y-down pixel passthrough
+            return (0.0, 0.0, float(self._screen_w), float(self._screen_h))
 
     # ── teardown ──────────────────────────────────────────────────────────────
 
