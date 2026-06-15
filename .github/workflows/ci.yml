@@ -43,4 +43,4 @@ jobs:
         shell: bash
         run: pip install pyyaml pytest dist/*.whl
       - name: Smoke-test — entry points, YAML, settings backend
-        run: pytest tests/integration/test_discovery.py -q -k "not integration"
+        run: pytest tests/integration/test_discovery.py -q -m "not integration"
