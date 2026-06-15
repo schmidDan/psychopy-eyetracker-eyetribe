@@ -72,3 +72,47 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
   - PENDING — ruff/black/isort/mypy clean; pytest green; coverage ≥90%
 - Deviations from plan: none
 - Open issues handed to Phase 2: implement `frames.py` (parse raw frame dicts from `FrameBuffer`)
+
+## Phase 2 — Frame parsing & data model  (status: DONE)
+
+- Date: 2026-06-15 / Agent: Claude Sonnet 4.6 / Branch: `phase-2-frames` / PR: pending
+- Delivered:
+  - `psychopy_eyetracker_eyetribe/eyetribe/frames.py` — implemented in full:
+    - Frozen dataclasses: `Point`, `EyeData(raw, avg, psize, pcenter)`, `Frame(time_ms, fix, state,
+      raw, avg, left, right)`.
+    - `TrackingState` frozen dataclass with `from_int(state: int)` classmethod decoding all 5 bitmask
+      flags into named booleans (`gaze`, `eyes`, `presence`, `fail`, `lost`).
+    - `parse_frame(payload: dict) -> Frame` — parses `lefteye`/`righteye` keys; stores `time` as
+      `time_ms`; `timestamp` string is intentionally discarded (not in Frame schema); raises
+      `FrameParseError` on any malformed input (missing keys, wrong types, non-dict).
+    - `Frame.gaze(source: "raw"|"avg") -> Point` — returns `self.raw` or `self.avg`.
+    - `Frame.is_gaze_valid() -> bool` — state-level check: GAZE set AND neither FAIL nor LOST.
+      Boundary documented in docstring: uncalibrated trackers may set GAZE but report 0,0;
+      the calibrated + in-bounds guard lives in the EyeTracker (Phase 3).
+    - Private helpers `_parse_point` / `_parse_eye` with context strings in error messages.
+  - `tests/unit/test_frames.py` — 59 tests covering all acceptance criteria:
+    - `TestParseFrameVariants` — round-trips valid binocular, eyes-only, blink (FAIL), LOST, and
+      5 malformed-input cases (missing key, bad point type, nested bad value, non-dict, missing eye
+      key, eye non-dict).
+    - `TestCapturedFrame` — parses `tests/manual/_captured_frame.json` and asserts exact field values
+      (time_ms=188928052, state=8/FAIL, raw=(0,0), is_gaze_valid()=False).
+    - `TestGazeHelper` — raw, avg, and default (raw) variants.
+    - `test_tracking_state_all_32_combinations` — parametrized over `range(32)`, checks each
+      boolean against the expected bitmask value deterministically.
+    - `test_is_gaze_valid` — 9 parametrized boundary cases (GAZE alone, GAZE+EYES+PRESENCE, state=0,
+      EYES+PRESENCE, GAZE+FAIL, GAZE+LOST, GAZE+FAIL+LOST, FAIL alone, LOST alone).
+    - `TestEyeDataFields` — field values and frozen-dataclass enforcement.
+- Acceptance criteria:
+  - PASS — round-trips every mock variant: valid binocular, eyes-only (no gaze), blink, LOST,
+    malformed → FrameParseError. Test output: 59 passed in 0.23 s.
+  - PASS — all 32 representable low-5-bit state combinations decode deterministically
+    (parametrized table-driven test `test_tracking_state_all_32_combinations[0-31]`).
+  - PASS — ruff/black/isort clean (2 files, 0 errors).
+  - PASS — mypy --strict: "Success: no issues found in 1 source file".
+  - PASS — coverage: `frames.py` 100% (70 stmts, 0 miss).
+- Deviations from plan: none.
+- Verified facts: no new wire-format discrepancies. `timestamp` field present in real frames is
+  intentionally not stored in Frame (not in the schema per plan); `time` (monotonic ms) stored as
+  `time_ms` as specified.
+- Open issues handed to Phase 3: wire `parse_frame` into `EyeTribeClient.ReaderThread`; implement
+  `EyeTracker._poll()` to drain `FrameBuffer` and emit `BinocularEyeSampleEvent`.

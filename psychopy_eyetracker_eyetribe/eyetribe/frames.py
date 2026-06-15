@@ -1,8 +1,5 @@
 # Distributed under the terms of the GNU General Public License v3 (GPLv3).
-"""Eye Tribe frame data model + parser + state-bitmask decoder (PsychoPy-free).
-
-STUB. Phase 2 implements ``parse_frame`` and the ``TrackingState`` decoder.
-"""
+"""Eye Tribe frame data model + parser + state-bitmask decoder (PsychoPy-free)."""
 
 from __future__ import annotations
 
@@ -38,6 +35,27 @@ class EyeData:
 
 
 @dataclass(frozen=True)
+class TrackingState:
+    """Named-boolean view of the Eye Tribe state bitmask."""
+
+    gaze: bool
+    eyes: bool
+    presence: bool
+    fail: bool
+    lost: bool
+
+    @classmethod
+    def from_int(cls, state: int) -> "TrackingState":
+        return cls(
+            gaze=bool(state & STATE_TRACKING_GAZE),
+            eyes=bool(state & STATE_TRACKING_EYES),
+            presence=bool(state & STATE_TRACKING_PRESENCE),
+            fail=bool(state & STATE_TRACKING_FAIL),
+            lost=bool(state & STATE_TRACKING_LOST),
+        )
+
+
+@dataclass(frozen=True)
 class Frame:
     time_ms: int
     fix: bool
@@ -48,14 +66,68 @@ class Frame:
     right: EyeData
 
     def gaze(self, source: GazeSource = "raw") -> Point:
-        """Return the combined gaze point for the requested source. Phase 2."""
-        raise NotImplementedError("Phase 2")
+        """Return the combined gaze point for the requested source."""
+        if source == "avg":
+            return self.avg
+        return self.raw
 
     def is_gaze_valid(self) -> bool:
-        """True when STATE_TRACKING_GAZE is set and neither FAIL nor LOST. Phase 2."""
-        raise NotImplementedError("Phase 2")
+        """True when STATE_TRACKING_GAZE is set and neither FAIL nor LOST.
+
+        State-level check only: an uncalibrated tracker sets GAZE but reports 0,0.
+        The calibrated + in-bounds guard lives in the EyeTracker (Phase 3).
+        """
+        return (
+            bool(self.state & STATE_TRACKING_GAZE)
+            and not bool(self.state & STATE_TRACKING_FAIL)
+            and not bool(self.state & STATE_TRACKING_LOST)
+        )
+
+
+def _parse_point(d: Any, ctx: str) -> Point:
+    if not isinstance(d, dict):
+        raise FrameParseError(f"{ctx}: expected dict, got {type(d).__name__}")
+    try:
+        return Point(x=float(d["x"]), y=float(d["y"]))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise FrameParseError(f"{ctx}: {exc}") from exc
+
+
+def _parse_eye(d: Any, ctx: str) -> EyeData:
+    if not isinstance(d, dict):
+        raise FrameParseError(f"{ctx}: expected dict, got {type(d).__name__}")
+    try:
+        return EyeData(
+            raw=_parse_point(d["raw"], f"{ctx}.raw"),
+            avg=_parse_point(d["avg"], f"{ctx}.avg"),
+            psize=float(d["psize"]),
+            pcenter=_parse_point(d["pcenter"], f"{ctx}.pcenter"),
+        )
+    except FrameParseError:
+        raise
+    except (KeyError, TypeError, ValueError) as exc:
+        raise FrameParseError(f"{ctx}: {exc}") from exc
 
 
 def parse_frame(payload: dict[str, Any]) -> Frame:
-    """Parse a raw Eye Tribe frame dict into a :class:`Frame`. Phase 2."""
-    raise NotImplementedError("Phase 2")
+    """Parse a raw Eye Tribe frame dict into a :class:`Frame`.
+
+    Raises :class:`FrameParseError` on any malformed input so callers can log and skip
+    without crashing the reader.
+    """
+    if not isinstance(payload, dict):
+        raise FrameParseError(f"payload must be a dict, got {type(payload).__name__}")
+    try:
+        return Frame(
+            time_ms=int(payload["time"]),
+            fix=bool(payload["fix"]),
+            state=int(payload["state"]),
+            raw=_parse_point(payload["raw"], "raw"),
+            avg=_parse_point(payload["avg"], "avg"),
+            left=_parse_eye(payload["lefteye"], "lefteye"),
+            right=_parse_eye(payload["righteye"], "righteye"),
+        )
+    except FrameParseError:
+        raise
+    except (KeyError, TypeError, ValueError) as exc:
+        raise FrameParseError(str(exc)) from exc
