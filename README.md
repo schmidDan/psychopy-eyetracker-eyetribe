@@ -9,6 +9,10 @@ PsychoPy-driven calibration.
 > **Status: Phase 0 scaffold.** Module bodies are stubs that raise `NotImplementedError`; the package
 > is installable and discoverable, and the test/lint skeleton is in place. Implementation proceeds per
 > [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md).
+>
+> **Repository:** private, single-contributor for now. `main` branch protection is a **deferred TODO**
+> — re-enable (require PR + passing CI) before adding collaborators or going public; until then the
+> per-phase PR flow is followed by convention. See [`docs/HUMAN_TASKS.md`](docs/HUMAN_TASKS.md).
 
 ## Requirements
 

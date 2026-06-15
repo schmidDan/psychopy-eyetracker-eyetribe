@@ -92,11 +92,14 @@ Categories: `tracker`, `calibration`, `heartbeat`.
 4. `{"category":"tracker","request":"set","values":{"push":true}}` — begin streaming.
 5. Start the heartbeat thread (see below).
 
-**Pushed frame** (arrives as `{"category":"tracker","request":"push","values":{"frame":{…}}}`):
+**Pushed frame** — in push mode the Server (build 0.9.77, confirmed on hardware 2026-06-15) emits frames
+as `{"category":"tracker","request":"get","values":{"frame":{…}}}`. Note `request` is **`"get"`**, not
+`"push"`; the reader MUST detect frame messages by the **presence of `values.frame`**, not the request
+string.
 ```
 frame = {
-  "timestamp": "2014-12-22 16:32:47.927",   # human-readable string
-  "time": 1419265967927,                    # epoch milliseconds (server clock)  -> Long
+  "timestamp": "2026-06-15 14:30:14.068",   # wall-clock string (absolute local time)
+  "time": 188928052,                        # MONOTONIC milliseconds (relative, ~uptime) -- NOT epoch
   "fix": true,                              # bool: is the gaze currently fixating
   "state": 7,                              # int: 32-bit status bitmask (see below)
   "raw":  {"x": 1024.5, "y": 720.3},        # gaze in SCREEN PIXELS, origin top-left
@@ -288,7 +291,9 @@ mechanically, so there is nothing to confirm by hand. Their **contents** are ful
 
 ## 6. Engineering conventions, CI & reporting
 
-**Branching / PRs.** `main` protected. One branch + PR per phase: `phase-N-short-name`, title
+**Branching / PRs.** `main` protection is a **deferred TODO** (private, single-contributor repo for
+now; re-enable — require PR + passing CI — before adding collaborators or going public). The flow is
+still followed by convention: one branch + PR per phase: `phase-N-short-name`, title
 `Phase N: <title>`. The PR description restates the phase acceptance criteria as a ticked checklist with
 evidence (test output, coverage %, screenshots for `[HARDWARE]`). Squash-merge.
 
@@ -348,13 +353,16 @@ Linear dependencies. Phases 0–7 are pure software against the mock; Phase 8 is
   PsychoPy 2026.1.3 source; (c) the ioHub device-YAML key structure read from the installed GazePoint/
   Tobii device (filenames are pinned: `default_eyetracker.yaml`, `supported_config_settings.yaml`);
   (d) confirmed PsychoPy 2026.1.3 / Python 3.10 versions.
-- The stub device doubles as the discovery proof: PsychoPy resolves `eyetracker.hw.eyetribe` via the
-  §5.1 entry point.
+- The stub device's entry point is registered and the `EyeTracker` class imports under PsychoPy; the
+  exact plugin-activation path that exposes `eyetracker.hw.eyetribe` is recorded in `REFERENCES.md`.
 **Acceptance criteria.**
 - `pip install -e .[dev]` succeeds in a PsychoPy 2026.1.3 / Python 3.10 environment.
 - CI green (lint + empty pytest) on `windows-latest`.
-- `import psychopy.iohub.devices.eyetracker.hw.eyetribe` resolves to the stub device (printed proof in
-  CI log), confirming the entry-point mechanism before real code is written.
+- Both §5.1 entry points are registered (asserted by `test_discovery.py`), and the `EyeTracker` class
+  imports under PsychoPy. **Note:** a bare `import psychopy.iohub.devices.eyetracker.hw.eyetribe` does
+  NOT resolve at import time — PsychoPy exposes plugin devices via its plugin system / at
+  `launchHubServer`, not as a plain importable module. The activation mechanism is pinned in
+  `REFERENCES.md`; end-to-end device load is verified in Phase 3 against the mock.
 - A test loads the stub device through ioHub's own config loader and asserts both
   `default_eyetracker.yaml` and `supported_config_settings.yaml` are found and parsed (a wrong filename
   fails CI — no manual verification).
@@ -398,14 +406,16 @@ frame is added as a golden fixture in Phase 8.
 ### Phase 3 — ioHub EyeTracker class (recording & polling)
 **Objective.** A working ioHub device streaming samples (calibration/transforms follow).
 **Deliverables.**
-- `EyeTracker(EyeTrackerDevice)` implementing (signatures per `REFERENCES.md`): `__init__`,
-  `setConnectionState`/`isConnected`, `setRecordingState`/`isRecordingEnabled`, `enableEventReporting`,
-  `getConfiguration`, `getEvents`/`clearEvents`, `getLastSample`, `getLastGazePosition`/`getPosition`,
-  and `_poll()` draining `FrameBuffer` → `BinocularEyeSampleEvent` with field mapping: `gaze_x/gaze_y`
-  from the configured `gaze_source` (default `raw`); the pupil-size field
-  (`*_pupil_measure1`, exact attribute names per `REFERENCES.md`) = `psize` (arbitrary units); the
-  per-eye camera-coordinate fields = `pcenter`; `status` per §3 validity mapping. Fixation
-  start/end events derived from `fix` transitions.
+- `EyeTracker(EyeTrackerDevice)` — implement only the **device-specific** methods (confirmed in
+  `REFERENCES.md`): `__init__`, `setConnectionState`/`isConnected`, `setRecordingState`/
+  `isRecordingEnabled`, `enableEventReporting`, `_poll()`, `trackerTime`/`trackerSec`. **Rely on the
+  base class** for `getEvents`/`clearEvents`/`getConfiguration`/`getLastSample`/`getLastGazePosition`/
+  `getPosition`/`isReportingEvents` and its native-event buffer — do not re-implement them. `_poll()`
+  drains the `FrameBuffer` and pushes one `BinocularEyeSampleEvent` per frame with the confirmed
+  mapping (REFERENCES.md): `left/right_gaze_x,y` ← transformed per-eye gaze (per `gaze_source`, default
+  `raw`); `left/right_eye_cam_x,y` ← `pcenter`; `left/right_pupil_measure1` (+ `_type`) ← `psize`
+  (arbitrary units); `status` ← §3 validity (calibrated + in-bounds). Fixation start/end events from
+  `fix` transitions.
 - `default_eyetracker.yaml` with the concrete defaults: `host: 127.0.0.1`, `port: 6555`,
   `api_version: 1`, `runtime_settings.sampling_rate: auto` (adopt the Server-reported `framerate`;
   resolved to the actual value at connect and used to set the poll interval), `track_eyes: BINOCULAR`,
@@ -433,8 +443,8 @@ config-driven gaze source.
   the Display bounds from ioHub and delegate to `transforms.py`, following the Tobii pattern. Documented
   in `docs/coordinate_systems.md` with a diagram and worked example.
 - `time_sync.py` (PsychoPy-free) backing `trackerTime()`/`trackerSec()`: at recording start, pair the
-  first frame's `time` (epoch **milliseconds**, converted to seconds) with the local PsychoPy time at
-  receipt, correcting for half the measured request/reply RTT; apply
+  first frame's `time` (**monotonic milliseconds**, relative/~uptime — not epoch; ÷1000 for seconds)
+  with the local PsychoPy time at receipt, correcting for half the measured request/reply RTT; apply
   `psychopy_time = tracker_time_s + offset`. Re-estimate the offset every 5 s and keep the latest.
   `docs/coordinate_systems.md` (timing section) states the residual latency budget
   = sampling latency (1/rate ≈ 33 ms @ 30 Hz) + transport.

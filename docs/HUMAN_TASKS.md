@@ -33,7 +33,7 @@ shell.) Installing into the Standalone is the faithful target; if you prefer not
 
 ## Setup — before Phase 0 work begins (one-time)
 
-- [ ] **Install the Eye Tribe Server** and connect the **ET1000** (USB 3). The company is defunct, but
+- [x] **Install the Eye Tribe Server** and connect the **ET1000** (USB 3). The company is defunct, but
       the official installers are preserved on GitHub at **`EyeTribe/sdk-installers`** → *Releases*:
       <https://github.com/EyeTribe/sdk-installers/releases>. Download the Windows SDK installer
       (`TheEyeTribeSDK-0.9.77-x86.exe`, the last release, 2016) and run it — it installs both the
@@ -43,9 +43,9 @@ shell.) Installing into the Standalone is the faithful target; if you prefer not
       it sees the tracker and shows the eye image.
 - [x] PsychoPy **2026.1.3** / Python **3.10.11** installed and confirmed.
 - [x] **Full GPLv3 text in `LICENSE`** — done (written directly into the repo; no action needed).
-- [ ] **Set the GitHub owner**: replace `<ORG>` in `pyproject.toml` (`[project.urls]`) with your
+- [x] **Set the GitHub owner**: replace `<ORG>` in `pyproject.toml` (`[project.urls]`) with your
       GitHub user/org.
-- [ ] **Initialise git and push**:
+- [x] **Initialise git and push** — done (private repo):
       ```powershell
       git init
       git add .
@@ -54,8 +54,10 @@ shell.) Installing into the Standalone is the faithful target; if you prefer not
       git remote add origin https://github.com/<ORG>/psychopy-eyetracker-eyetribe.git
       git push -u origin main
       ```
-- [ ] On GitHub: **protect `main`** (Settings → Branches → require PR + passing CI before merge).
-- [ ] **CRITICAL GATE — hardware smoke** (confirms the Server + ET1000 actually stream *before* any
+- [x] *(Deferred TODO)* On GitHub: **protect `main`** (require PR + passing CI before merge).
+      **Deferred** while this is a **private, single-contributor** repo; re-enable before adding
+      collaborators or going public. Until then, the per-phase PR flow is followed by convention.
+- [x] **CRITICAL GATE — hardware smoke** (confirms the Server + ET1000 actually stream *before* any
       further investment; needs only a socket, no plugin/PsychoPy):
       ```powershell
       & $py "$repo\tests\manual\smoke_socket.py"
@@ -71,12 +73,10 @@ shell.) Installing into the Standalone is the faithful target; if you prefer not
 The scaffold already exists and passed lint + the PsychoPy-free tests in a sandbox. Your job is to run
 it **inside the real PsychoPy** and capture the machine-only facts.
 
-- [ ] **Install editable into the Standalone** (Administrator PowerShell):
-      ```powershell
-      & $py -m pip install --upgrade pip
-      & $py -m pip install -e "$repo[dev]"
-      ```
-- [ ] **Lint + tests on the real interpreter**:
+- [x] **Install editable into the Standalone** — done (`pip install -e .[dev]` succeeded).
+- [x] **Lint + tests on the real interpreter** — done: ruff/black/isort clean; **10 passed / 2 skipped**
+      (`test_eyetracker_class_loads_under_psychopy` passed → the `EyeTrackerDevice` base path is correct;
+      the 2 skips are the Phase 1/3 mock placeholders). Commands for reference:
       ```powershell
       cd $repo
       & $py -m ruff check .
@@ -84,17 +84,14 @@ it **inside the real PsychoPy** and capture the machine-only facts.
       & $py -m isort --check-only .
       & $py -m pytest -m "not hardware" -q
       ```
-      The 3 tests skipped in the sandbox (the PsychoPy/mock ones) should now **run**; the
-      mock-dependent ones still skip until Phase 1, but `test_eyetracker_class_loads_under_psychopy`
-      should pass.
-- [ ] **Confirm the device namespace resolves through PsychoPy's plugin loader**:
-      ```powershell
-      & $py -c "import psychopy.iohub.devices.eyetracker.hw.eyetribe as m; print(m.EyeTracker)"
-      ```
-      If a plain import doesn't resolve, the plugin may need an explicit activation/scan call — find
-      the working mechanism and **record it** in `docs/REFERENCES.md` (this is the one
-      `[TO CONFIRM ON MACHINE]` discovery item).
-- [ ] **Capture the `[TO CONFIRM ON MACHINE]` facts** into `docs/REFERENCES.md`:
+- [x] **Plugin-discovery mechanism pinned** (via `check_discovery.py`, 2026-06-15): `scanPlugins()`
+      sees the plugin (returns 1); `activatePlugins()` runs. PsychoPy creates **no** importable
+      `hw.eyetribe` module — by design. ioHub resolves the device from the entry point at
+      `launchHubServer` time via `eyetracker.hw.eyetribe.EyeTracker`. Recorded in `docs/REFERENCES.md`;
+      end-to-end load is verified in Phase 1/3 against the mock. Nothing more to do here for Phase 0.
+- [x] **Capture the `[TO CONFIRM ON MACHINE]` facts** into `docs/REFERENCES.md` — done 2026-06-15
+      (EyeTrackerDevice surface, `BinocularEyeSampleEvent` fields + mapping, settings base
+      `EyetrackerBackend` → `settings.py` fixed). Commands used, for reference:
       ```powershell
       # EyeTrackerDevice source file + method surface
       & $py -c "import inspect, psychopy.iohub.devices.eyetracker as e; print(inspect.getsourcefile(e.EyeTrackerDevice))"
@@ -106,8 +103,10 @@ it **inside the real PsychoPy** and capture the machine-only facts.
       # A sibling device's YAML, to align our key set/schema tokens
       Get-ChildItem -Recurse -ErrorAction SilentlyContinue "C:\Program Files\PsychoPy" -Filter "default_eyetracker.yaml" | Select-Object FullName
       ```
-      Paste/transcribe the results into the matching `[TO CONFIRM ON MACHINE]` sections and flip them
-      to `[CONFIRMED]`. (An agent can do the transcription if you paste the raw output back to it.)
+- [x] **Phase 0 fact-finding closed** (2026-06-15): the in-tree MouseGaze device uses exactly
+      `default_eyetracker.yaml` + `supported_config_settings.yaml` → our filenames are correct (no
+      rename); and `EyeTribeEyetrackerBackend.__mro__` is `(…, EyetrackerBackend, object)` → the backend
+      subclasses cleanly. All `[TO CONFIRM]` items in `docs/REFERENCES.md` are resolved.
 - [ ] **Review & merge** the Phase 0 PR once CI is green and `REFERENCES.md` is complete.
 
 ---
