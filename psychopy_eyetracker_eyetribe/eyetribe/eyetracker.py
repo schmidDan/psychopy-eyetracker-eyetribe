@@ -44,6 +44,7 @@ class EyeTracker(EyeTrackerDevice):
     ]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialise the Eye Tribe ioHub device from the device config dict."""
         EyeTrackerDevice.__init__(self, *args, **kwargs)
         config = self.getConfiguration()
         host = config.get("host", "127.0.0.1")
@@ -67,6 +68,7 @@ class EyeTracker(EyeTrackerDevice):
     # ── connection lifecycle ──────────────────────────────────────────────────
 
     def setConnectionState(self, enable: bool) -> bool:
+        """Connect to (``True``) or disconnect from (``False``) the Eye Tribe Server."""
         if enable:
             if self._client.state != STATE_CONNECTED:
                 try:
@@ -98,11 +100,13 @@ class EyeTracker(EyeTrackerDevice):
             )
 
     def isConnected(self) -> bool:
+        """Return ``True`` when the socket to the Eye Tribe Server is open."""
         return self._client.state == STATE_CONNECTED
 
     # ── recording lifecycle ───────────────────────────────────────────────────
 
     def setRecordingState(self, recording: bool) -> bool:
+        """Enable or disable gaze-event recording and ioHub event reporting."""
         current = self.isRecordingEnabled()
         if recording and not current:
             self._recording = True
@@ -115,9 +119,11 @@ class EyeTracker(EyeTrackerDevice):
         return recording
 
     def isRecordingEnabled(self) -> bool:
+        """Return ``True`` while gaze recording is active."""
         return self._recording
 
     def enableEventReporting(self, enabled: bool = True) -> bool:
+        """Delegate to :meth:`setRecordingState` (ioHub hook)."""
         return self.setRecordingState(enabled)
 
     # ── calibration (Phase 5) ─────────────────────────────────────────────────
@@ -308,6 +314,7 @@ class EyeTracker(EyeTrackerDevice):
     # ── polling ───────────────────────────────────────────────────────────────
 
     def _poll(self) -> None:
+        """Drain the frame buffer and emit ioHub events (called by the ioHub timer)."""
         if not self.isConnected() or not self.isRecordingEnabled():
             return
 
@@ -324,6 +331,7 @@ class EyeTracker(EyeTrackerDevice):
             self._process_frame(frame, logged_time)
 
     def _process_frame(self, frame: Frame, logged_time: float) -> None:
+        """Convert one :class:`~.frames.Frame` to ioHub events and push them to the buffer."""
         device_time = frame.time_ms * self.DEVICE_TIMEBASE_TO_SEC
 
         # Phase 4: use ClockSync for accurate PsychoPy-timebase conversion.
@@ -422,6 +430,7 @@ class EyeTracker(EyeTrackerDevice):
         gaze_y: float,
         pupil: float,
     ) -> None:
+        """Emit FixationStartEvent / FixationEndEvent on ``fix`` state transitions."""
         was_fix = self._last_fix
         is_fix = frame.fix
 
@@ -610,6 +619,7 @@ class EyeTracker(EyeTrackerDevice):
     # ── teardown ──────────────────────────────────────────────────────────────
 
     def _close(self) -> None:
+        """Stop recording, disconnect, and call the base-class teardown."""
         self.setRecordingState(False)
         self.setConnectionState(False)
         EyeTrackerDevice._close(self)

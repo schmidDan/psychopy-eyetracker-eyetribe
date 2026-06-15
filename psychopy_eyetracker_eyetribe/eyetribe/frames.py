@@ -22,12 +22,16 @@ class FrameParseError(ValueError):
 
 @dataclass(frozen=True)
 class Point:
+    """2-D gaze or pupil-centre coordinate (screen pixels or normalised)."""
+
     x: float
     y: float
 
 
 @dataclass(frozen=True)
 class EyeData:
+    """Per-eye data block extracted from an Eye Tribe frame."""
+
     raw: Point
     avg: Point
     psize: float
@@ -46,6 +50,7 @@ class TrackingState:
 
     @classmethod
     def from_int(cls, state: int) -> "TrackingState":
+        """Decode a raw Eye Tribe ``state`` bitmask into named boolean flags."""
         return cls(
             gaze=bool(state & STATE_TRACKING_GAZE),
             eyes=bool(state & STATE_TRACKING_EYES),
@@ -57,6 +62,8 @@ class TrackingState:
 
 @dataclass(frozen=True)
 class Frame:
+    """Parsed Eye Tribe gaze frame (one per pushed JSON message)."""
+
     time_ms: int
     fix: bool
     state: int

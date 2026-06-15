@@ -30,6 +30,7 @@ class EyeTribeEyetrackerBackend(_Base):  # type: ignore[misc, valid-type]
 
     @classmethod
     def getParams(cls):  # type: ignore[override]
+        """Return Builder parameter definitions for the Eye Tribe eyetracker."""
         if Param is None:
             return {}, []
 
@@ -78,6 +79,7 @@ class EyeTribeEyetrackerBackend(_Base):  # type: ignore[misc, valid-type]
 
     @classmethod
     def writeDeviceCode(cls, inits, buff):  # type: ignore[override]
+        """Write the ioHub device config block into a Builder-generated script."""
         code = (
             "ioConfig[%(eyetracker)s] = {\n"
             "    'name': 'tracker',\n"

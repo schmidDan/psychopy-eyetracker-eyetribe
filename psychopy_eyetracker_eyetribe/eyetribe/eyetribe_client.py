@@ -44,18 +44,21 @@ class FrameBuffer:
         self._lock = threading.Lock()
 
     def put(self, frame: dict[str, Any]) -> None:
+        """Append *frame*; drop the oldest entry if the buffer is full."""
         with self._lock:
             if len(self._buf) >= self._capacity:
                 self._buf.popleft()
             self._buf.append(frame)
 
     def get_all(self) -> list[dict[str, Any]]:
+        """Drain and return all buffered frames (clears the buffer)."""
         with self._lock:
             items = list(self._buf)
             self._buf.clear()
             return items
 
     def get_one(self, timeout_s: float = 0.0) -> Optional[dict[str, Any]]:
+        """Return (and remove) one frame, waiting up to *timeout_s* seconds."""
         deadline = time.monotonic() + timeout_s
         while True:
             with self._lock:
@@ -172,6 +175,7 @@ class EyeTribeClient:
     """
 
     def __init__(self, host: str = HOST_DEFAULT, port: int = PORT_DEFAULT) -> None:
+        """Initialise client parameters; call :meth:`connect` to open the socket."""
         self.host = host
         self.port = port
         self.state: str = STATE_DISCONNECTED

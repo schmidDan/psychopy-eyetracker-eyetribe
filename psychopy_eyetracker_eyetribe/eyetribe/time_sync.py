@@ -37,6 +37,7 @@ class ClockSync:
     """
 
     def __init__(self, reestimate_interval_s: float = REESTIMATE_INTERVAL_S) -> None:
+        """Create an uninitialised sync; call :meth:`update` before converting times."""
         self.reestimate_interval_s = reestimate_interval_s
         self._offset: float = 0.0
         self._last_update_local_s: float = 0.0

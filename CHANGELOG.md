@@ -6,6 +6,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/); the project 
 ## [Unreleased]
 
 ### Added
+- **Phase 7 documentation & examples**: expanded `README.md` with prerequisites
+  (Eye Tribe Server install source), install instructions, Coder and Builder quick
+  starts, limitations table, and troubleshooting section. Added
+  `examples/coder_demo.py` (runs end-to-end against the bundled mock — no hardware
+  required), `examples/builder_example.psyexp` (ready-to-open Builder template with
+  Eye Tribe configured), and `docs/implementation_notes.md` (device config keys,
+  event field table, coordinate system, calibration protocol, known limitations).
+  All public API now has docstrings. CI extended with a coder-demo step (runs the
+  demo against the mock) and a doc-link check.
 - **Phase 6 packaging & Builder backend**: fleshed out `EyeTribeEyetrackerBackend` with `key`,
   `getParams()` (host, port, gaze source, calibration target count), and `writeDeviceCode()` so the
   Eye Tribe device appears in the PsychoPy Builder Eyetracker component dropdown. Added a CI
