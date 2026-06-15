@@ -40,6 +40,7 @@ jobs:
           python -m pip install --upgrade pip build
           python -m build --wheel
       - name: Install wheel into clean env (no source tree)
+        shell: bash
         run: pip install pyyaml pytest dist/*.whl
       - name: Smoke-test — entry points, YAML, settings backend
         run: pytest tests/integration/test_discovery.py -q -k "not integration"
