@@ -16,7 +16,7 @@ from typing import Any, Callable
 
 DEFAULT_TARGET_COUNT = 9
 SUPPORTED_TARGET_COUNTS = (5, 9, 12)
-SETTLE_MS = 750   # ms to let the participant fixate before sampling starts
+SETTLE_MS = 750  # ms to let the participant fixate before sampling starts
 SAMPLE_MS = 1000  # ms sampling window per calibration point
 
 # Normalized (x, y) target positions in Eye Tribe screen space.
@@ -25,20 +25,35 @@ SAMPLE_MS = 1000  # ms sampling window per calibration point
 _LAYOUTS: dict[int, tuple[tuple[float, float], ...]] = {
     5: (
         (0.5, 0.5),
-        (0.1, 0.1), (0.9, 0.1),
-        (0.9, 0.9), (0.1, 0.9),
+        (0.1, 0.1),
+        (0.9, 0.1),
+        (0.9, 0.9),
+        (0.1, 0.9),
     ),
     9: (
         (0.5, 0.5),
-        (0.1, 0.5), (0.9, 0.5),
-        (0.1, 0.1), (0.5, 0.1), (0.9, 0.1),
-        (0.9, 0.9), (0.5, 0.9), (0.1, 0.9),
+        (0.1, 0.5),
+        (0.9, 0.5),
+        (0.1, 0.1),
+        (0.5, 0.1),
+        (0.9, 0.1),
+        (0.9, 0.9),
+        (0.5, 0.9),
+        (0.1, 0.9),
     ),
     12: (
         (0.5, 0.5),
-        (0.1, 0.1), (0.9, 0.1), (0.9, 0.9), (0.1, 0.9),
-        (0.1, 0.5), (0.9, 0.5), (0.5, 0.1), (0.5, 0.9),
-        (0.3, 0.3), (0.7, 0.3), (0.3, 0.7),
+        (0.1, 0.1),
+        (0.9, 0.1),
+        (0.9, 0.9),
+        (0.1, 0.9),
+        (0.1, 0.5),
+        (0.9, 0.5),
+        (0.5, 0.1),
+        (0.5, 0.9),
+        (0.3, 0.3),
+        (0.7, 0.3),
+        (0.3, 0.7),
     ),
 }
 

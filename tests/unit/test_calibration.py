@@ -242,12 +242,9 @@ def test_full_calibration_sequence_message_order(n):
     layout = point_layout(n)
 
     seq.start(n)
-    last_raw = None
     for x_norm, y_norm in layout:
         seq.point_start(x_norm * 1920, y_norm * 1080)
-        raw = seq.point_end()
-        if raw is not None:
-            last_raw = raw
+        seq.point_end()
 
     expected = ["start"] + ["pointstart", "pointend"] * n
     assert t.requests == expected

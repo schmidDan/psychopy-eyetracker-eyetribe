@@ -12,9 +12,8 @@ Part B — EyeTracker.runSetupProcedure with mocked PsychoPy visual layer.
 
 from __future__ import annotations
 
-import time
 from typing import Any
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -81,12 +80,9 @@ def test_full_calibration_run_message_sequence(sequencer, calib_server, target_c
     layout = point_layout(target_count)
 
     sequencer.start(target_count)
-    last_raw: dict[str, Any] | None = None
     for x_norm, y_norm in layout:
         sequencer.point_start(x_norm * 1920, y_norm * 1080)
-        raw = sequencer.point_end()
-        if raw is not None:
-            last_raw = raw
+        sequencer.point_end()
 
     log = calib_server.get_calib_log()
     requests = [m["request"] for m in log]
@@ -243,16 +239,29 @@ def _key_sequence(*keys: str) -> list[list[str]]:
 
 @pytest.fixture
 def srv_9pt():
-    srv = MockEyeTribeServer(port=0, calib_result={
-        "result": True,
-        "deg": 0.71,
-        "degl": 0.66,
-        "degr": 0.77,
-        "calibpoints": [{"state": 1, "cp": {"x": 960, "y": 540},
-                         "mecp": {"x": 961, "y": 541},
-                         "ad": 0.65, "adl": 0.60, "adr": 0.70,
-                         "mep": 10.0, "mepl": 9.0, "mepr": 11.0}] * 9,
-    })
+    srv = MockEyeTribeServer(
+        port=0,
+        calib_result={
+            "result": True,
+            "deg": 0.71,
+            "degl": 0.66,
+            "degr": 0.77,
+            "calibpoints": [
+                {
+                    "state": 1,
+                    "cp": {"x": 960, "y": 540},
+                    "mecp": {"x": 961, "y": 541},
+                    "ad": 0.65,
+                    "adl": 0.60,
+                    "adr": 0.70,
+                    "mep": 10.0,
+                    "mepl": 9.0,
+                    "mepr": 11.0,
+                }
+            ]
+            * 9,
+        },
+    )
     srv.start()
     yield srv
     srv.stop()
@@ -276,7 +285,9 @@ def test_run_setup_procedure_success(srv_9pt):
     srv_9pt.clear_calib_log()
 
     with patch.dict("sys.modules", {"psychopy.visual": pp_visual, "psychopy.event": pp_event}):
-        with patch("psychopy_eyetracker_eyetribe.eyetribe.eyetracker.pp_visual", pp_visual, create=True):
+        with patch(
+            "psychopy_eyetracker_eyetribe.eyetribe.eyetracker.pp_visual", pp_visual, create=True
+        ):
             result = t._run_calib_loop(win, 9, 1920, 1080, pp_event, pp_visual)
     t._close()
     _reset_singleton()

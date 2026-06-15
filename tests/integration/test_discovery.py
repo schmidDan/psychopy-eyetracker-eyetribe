@@ -37,6 +37,26 @@ def test_device_yaml_present_and_parses(fname):
     assert "eyetracker.hw.eyetribe.EyeTracker" in data
 
 
+def test_settings_backend_label_and_key():
+    from psychopy_eyetracker_eyetribe.eyetribe.settings import EyeTribeEyetrackerBackend
+
+    assert EyeTribeEyetrackerBackend.label == "Eye Tribe"
+    assert EyeTribeEyetrackerBackend.key == "eyetracker.hw.eyetribe.EyeTracker"
+
+
+@pytest.mark.integration
+def test_settings_backend_params_under_psychopy():
+    pytest.importorskip("psychopy")
+    from psychopy_eyetracker_eyetribe.eyetribe.settings import EyeTribeEyetrackerBackend
+
+    params, order = EyeTribeEyetrackerBackend.getParams()
+    assert set(order) == {"etHost", "etPort", "etGazeSource", "etCalibTargetCount"}
+    assert params["etHost"].val == "127.0.0.1"
+    assert params["etPort"].val == 6555
+    assert params["etGazeSource"].val == "raw"
+    assert params["etCalibTargetCount"].val == 9
+
+
 @pytest.mark.integration
 def test_eyetracker_class_loads_under_psychopy():
     pytest.importorskip("psychopy")

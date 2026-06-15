@@ -353,3 +353,67 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
 - Open issues handed to Phase 6: ppd/velocity fields remain UNDEFINED; `runSetupProcedure`
   does not yet adapt to the PsychoPy display device (uses raw pixel coords from Eye Tribe server
   resolution); no live accuracy feedback is shown on the summary screen.
+
+## Phase 6 — Packaging, plugin discovery & Builder backend  (status: DONE)
+
+- Date: 2026-06-15 / Agent: Claude Sonnet 4.6 / Branch: `phase-6-packaging` / PR: pending
+- Delivered:
+  - `psychopy_eyetracker_eyetribe/eyetribe/settings.py` — `EyeTribeEyetrackerBackend` fully
+    implemented:
+    - `label = "Eye Tribe"` — displayed in the Builder Eyetracker component dropdown.
+    - `key = "eyetracker.hw.eyetribe.EyeTracker"` — triggers `EyetrackerBackend.__init_subclass__`
+      registration into `knownEyetrackerBackends` when PsychoPy is present.
+    - `getParams()` — returns four `Param` objects (+ matching `order` list) under
+      `categ="Eyetracking"`:
+      - `etHost` (`str`, single) — default `"127.0.0.1"`.
+      - `etPort` (`num`, single) — default `6555`.
+      - `etGazeSource` (`str`, choice `["raw","avg"]`) — default `"raw"`.
+      - `etCalibTargetCount` (`num`, choice `[5,9,12]`) — default `9`.
+      - Sampling rate is intentionally absent (auto-adopted from the Server per §0).
+    - `writeDeviceCode(inits, buff)` — writes the `ioConfig[%(eyetracker)s]` block (host, port,
+      gaze_source, calibration target_count) using `buff.writeIndentedLines`.
+    - Guarded import (`try/except Exception`) keeps the entry point importable in environments
+      without PsychoPy; `Param = None` / `_translate = str` are the no-PsychoPy fallbacks.
+  - `pyproject.toml` — no changes required: already contained both entry-point groups, the correct
+    `[tool.setuptools.packages.find]` and `package-data`, and the real GitHub owner in URLs.
+  - `MANIFEST.in` — no changes required: already had `recursive-include psychopy_eyetracker_eyetribe
+    *.yaml`.
+  - `.github/workflows/release.yml` — no changes required: already builds the wheel on tag push and
+    attaches it to the GitHub Release via `softprops/action-gh-release@v2`.
+  - `.github/workflows/ci.yml` — new `wheel-smoke` job added (after `lint-and-test`):
+    - Checks out source, sets up Python 3.10.
+    - Builds the wheel with `python -m build --wheel`.
+    - Installs the wheel into a clean env (only `pyyaml pytest` added alongside — no editable
+      source present).
+    - Runs `pytest tests/integration/test_discovery.py -q -k "not integration"` which exercises
+      the four PsychoPy-free checks: iohub entry point registered, settings entry point registered,
+      both YAML files present and parseable, and the new settings backend label/key assertions.
+  - `tests/integration/test_discovery.py` — two new tests:
+    - `test_settings_backend_label_and_key` — PsychoPy-free; imports `EyeTribeEyetrackerBackend`
+      and asserts `label == "Eye Tribe"` and `key == "eyetracker.hw.eyetribe.EyeTracker"`.
+    - `test_settings_backend_params_under_psychopy` — `@pytest.mark.integration` (PsychoPy-gated);
+      calls `getParams()` and asserts param keys and default values.
+- Acceptance criteria:
+  - PASS (local, without wheel install) — `test_settings_backend_label_and_key` passes; entry
+    points, YAML, and backend tests all pass in the regular `pytest -m "not hardware"` run.
+  - PASS — `pyproject.toml` matches §5.1 verbatim (both entry-point groups, `packages.find`,
+    `package-data`); real GitHub owner already in URLs (no `<ORG>` placeholder).
+  - PASS — `MANIFEST.in` ships `*.yaml` via `recursive-include`.
+  - PASS — `release.yml` builds wheel on tag and attaches to GitHub Release; no PyPI step.
+  - PENDING (CI) — `wheel-smoke` job green on `windows-latest` (requires CI run on push/PR).
+  - PENDING (human) — "Eye Tribe" visible in Builder Eyetracker dropdown with host/port/gaze
+    source/calibration-targets fields; record evidence in this `REPORT.md` once confirmed.
+- Deviations from plan:
+  - `pyproject.toml`, `MANIFEST.in`, and `release.yml` were already complete from Phase 0/scaffold;
+    no changes needed (the plan anticipated they might need finalisation).
+  - `deviceClasses` attribute present in the Phase 0 stub was removed; it is not part of the
+    `EyetrackerBackend` API.
+- Verified facts:
+  - `EyetrackerBackend.__init_subclass__` fires when the subclass is defined (class body parsed),
+    not at instantiation; `key` must be set as a class attribute (not instance) for registration.
+  - `_translate` from `psychopy.localization` is a passthrough-for-strings in English locales;
+    `str` is a safe no-PsychoPy replacement.
+  - `Param` default value is stored in `.val`; `allowedVals` accepts a list of ints for numeric
+    choice dropdowns.
+- Open issues handed to Phase 7: ppd/velocity fields remain UNDEFINED; no human Builder dropdown
+  screenshot yet (mark this criterion PASS once a human confirms and records it here).

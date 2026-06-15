@@ -368,5 +368,5 @@ def test_tracker_time_returns_float(tracker):
     assert isinstance(ts, float), "trackerSec() did not return float"
     assert tt > 0, "trackerTime() not positive"
     assert ts > 0, "trackerSec() not positive"
-    # trackerSec ≈ trackerTime * 0.001
-    assert abs(ts - tt * 0.001) < 1e-6
+    # trackerSec ≈ trackerTime * 0.001; tolerance 10 ms — each call re-reads the clock
+    assert abs(ts - tt * 0.001) < 1e-2

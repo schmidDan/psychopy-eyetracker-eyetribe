@@ -34,8 +34,8 @@ class EyeTracker(EyeTrackerDevice):
     DEVICE_TIMEBASE_TO_SEC = 0.001
 
     # Calibration timing (seconds); exposed as class attributes so tests can override them.
-    _CALIB_SETTLE_S: float = 0.750   # = SETTLE_MS / 1000
-    _CALIB_SAMPLE_S: float = 1.000   # = SAMPLE_MS / 1000
+    _CALIB_SETTLE_S: float = 0.750  # = SETTLE_MS / 1000
+    _CALIB_SAMPLE_S: float = 1.000  # = SAMPLE_MS / 1000
 
     EVENT_CLASS_NAMES = [
         "BinocularEyeSampleEvent",
@@ -143,13 +143,7 @@ class EyeTracker(EyeTrackerDevice):
             log.error("PsychoPy not available; cannot run calibration")
             return EyeTrackerConstants.EYETRACKER_INTERFACE_METHOD_NOT_SUPPORTED
 
-        from .calibration import (
-            DEFAULT_TARGET_COUNT,
-            SUPPORTED_TARGET_COUNTS,
-            CalibrationSequencer,
-            parse_calibresult,
-            point_layout,
-        )
+        from .calibration import DEFAULT_TARGET_COUNT, SUPPORTED_TARGET_COUNTS
 
         config = self.getConfiguration()
         calib_cfg = config.get("calibration", {})
@@ -185,9 +179,7 @@ class EyeTracker(EyeTrackerDevice):
         win.setMouseVisible(False)
 
         try:
-            return self._run_calib_loop(
-                win, target_count, screen_w, screen_h, pp_event, pp_visual
-            )
+            return self._run_calib_loop(win, target_count, screen_w, screen_h, pp_event, pp_visual)
         finally:
             win.setMouseVisible(True)
             win.close()
@@ -213,9 +205,7 @@ class EyeTracker(EyeTrackerDevice):
         outer = pp_visual.Circle(
             win, radius=30, units="pix", fillColor=(0.8, 0, 0), lineColor=(1, 1, 1), lineWidth=2
         )
-        inner = pp_visual.Circle(
-            win, radius=8, units="pix", fillColor=(1, 1, 1), lineColor=None
-        )
+        inner = pp_visual.Circle(win, radius=8, units="pix", fillColor=(1, 1, 1), lineColor=None)
         msg_stim = pp_visual.TextStim(
             win, text="", units="pix", height=28, color=(1, 1, 1), wrapWidth=screen_w * 0.9
         )
@@ -293,9 +283,7 @@ class EyeTracker(EyeTrackerDevice):
             if last_calibresult_raw is not None:
                 result = parse_calibresult(last_calibresult_raw)
                 ok_str = "OK" if result.success else "FAILED"
-                lines = [
-                    f"Calibration {ok_str}  |  Overall: {result.avg_error_deg:.2f}°"
-                ]
+                lines = [f"Calibration {ok_str}  |  Overall: {result.avg_error_deg:.2f}°"]
                 for i, pt in enumerate(result.per_point, 1):
                     ad = pt.get("ad", float("nan"))
                     lines.append(f"  Point {i:2d}: {ad:.2f}°")
