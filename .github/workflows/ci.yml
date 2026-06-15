@@ -23,7 +23,7 @@ jobs:
         run: black --check .
       - name: isort
         run: isort --check-only .
+      - name: Mypy (PsychoPy-free core)
+        run: mypy
       - name: Pytest
-        run: pytest -m "not hardware" -q
-      # Phase 1+ adds: mypy (strict, PsychoPy-free core) and a >=90% core coverage gate.
-      # See docs/DEVELOPMENT_PLAN.md section 6.
+        run: pytest -m "not hardware" -q --cov=psychopy_eyetracker_eyetribe.eyetribe.eyetribe_client --cov=psychopy_eyetracker_eyetribe.mock.mock_server --cov-report=term-missing --cov-fail-under=90

@@ -68,7 +68,9 @@ files = [
   "psychopy_eyetracker_eyetribe/eyetribe/transforms.py",
   "psychopy_eyetracker_eyetribe/eyetribe/time_sync.py",
   "psychopy_eyetracker_eyetribe/eyetribe/calibration.py",
+  "psychopy_eyetracker_eyetribe/mock/mock_server.py",
 ]
+follow_imports = "skip"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -43,3 +43,32 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
   (`default_eyetracker.yaml` + `supported_config_settings.yaml`) — no rename; backend MRO confirms it
   subclasses `EyetrackerBackend`. **All `[TO CONFIRM]` items resolved.** Only the Phase 0 PR
   review/merge (human) remains before Phase 1.
+
+## Phase 1 — Transport layer + Mock server  (status: IN PROGRESS)
+
+- Date: 2026-06-15 / Agent: Claude Sonnet 4.6 / Branch: `phase-1-transport` / PR: pending
+- Delivered:
+  - `psychopy_eyetracker_eyetribe/mock/mock_server.py` — `MockEyeTribeServer`: binds a free port;
+    speaks `tracker set version`, `tracker get <keys>`, `tracker set push`; pushes synthesized frames
+    at a configurable rate (default 30 Hz) using `{"category":"tracker","request":"get","values":{"frame":{…}}}`;
+    enforces heartbeats (drops client if no heartbeat within `heartbeat_interval_ms`); scriptable
+    calibration responder; context-manager + `start()`/`stop()`. Gaze models: `fixed_point_model`,
+    `linear_sweep_model`; injectable blink/`STATE_TRACKING_LOST` segments via `_Segment`.
+  - `psychopy_eyetracker_eyetribe/eyetribe/eyetribe_client.py` — `EyeTribeClient`: `connect()` steps
+    1–5 per §3; `close()` teardown; reconnect (3 × 0.5 s backoff → `DISCONNECTED`); request/reply
+    with 2 s timeout; `ReaderThread` detecting frames by `values.frame` presence → `FrameBuffer`
+    (capacity 1024, drop oldest); `HeartbeatThread` at `heartbeat_interval_ms/2`; structured logging.
+  - `tests/conftest.py` — `mock_server` fixture with thread-leak assertion.
+  - `tests/unit/test_client.py` — framing, routing, timeout, FrameBuffer overflow, lifecycle.
+  - `tests/integration/test_client_against_mock.py` — lifecycle, rate ±10%, heartbeat endurance,
+    heartbeat-stop → disconnect → reconnect, buffer overflow.
+  - `.github/workflows/ci.yml` — mypy gate (strict, PsychoPy-free core) + coverage gate (≥90%).
+- Acceptance criteria:
+  - PENDING — rate ±10%: test_frame_rate_within_10_percent parametrized over [10, 30] Hz
+  - PENDING — heartbeat ≥30 s: test_heartbeat_keeps_link_alive_30s (sped up via short interval)
+  - PENDING — stop heartbeat → disconnect → reconnect: test_stopping_heartbeats_causes_disconnect_and_reconnect
+  - PENDING — no leaked threads/sockets: asserted in unit + conftest teardown
+  - PENDING — zero PsychoPy imports: verified by module-level import test + mypy
+  - PENDING — ruff/black/isort/mypy clean; pytest green; coverage ≥90%
+- Deviations from plan: none
+- Open issues handed to Phase 2: implement `frames.py` (parse raw frame dicts from `FrameBuffer`)
