@@ -401,8 +401,9 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
   - PASS — `MANIFEST.in` ships `*.yaml` via `recursive-include`.
   - PASS — `release.yml` builds wheel on tag and attaches to GitHub Release; no PyPI step.
   - PENDING (CI) — `wheel-smoke` job green on `windows-latest` (requires CI run on push/PR).
-  - PENDING (human) — "Eye Tribe" visible in Builder Eyetracker dropdown with host/port/gaze
-    source/calibration-targets fields; record evidence in this `REPORT.md` once confirmed.
+  - PASS (human, 2026-06-15) — "Eye Tribe" visible in Builder Eyetracker component dropdown;
+    host, port, gaze source, and calibration-targets fields present with correct defaults.
+    Screenshot: `docs/screenshots/phase6_builder_dropdown.png`.
 - Deviations from plan:
   - `pyproject.toml`, `MANIFEST.in`, and `release.yml` were already complete from Phase 0/scaffold;
     no changes needed (the plan anticipated they might need finalisation).
