@@ -9,6 +9,7 @@ Phase 5 will add PsychoPy-driven calibration.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from psychopy.iohub.constants import EventConstants, EyeTrackerConstants
@@ -31,6 +32,10 @@ class EyeTracker(EyeTrackerDevice):
 
     # tracker ``time`` field is a monotonic millisecond counter (~uptime); 0.001 converts to sec
     DEVICE_TIMEBASE_TO_SEC = 0.001
+
+    # Calibration timing (seconds); exposed as class attributes so tests can override them.
+    _CALIB_SETTLE_S: float = 0.750   # = SETTLE_MS / 1000
+    _CALIB_SAMPLE_S: float = 1.000   # = SAMPLE_MS / 1000
 
     EVENT_CLASS_NAMES = [
         "BinocularEyeSampleEvent",
@@ -115,10 +120,202 @@ class EyeTracker(EyeTrackerDevice):
     def enableEventReporting(self, enabled: bool = True) -> bool:
         return self.setRecordingState(enabled)
 
-    # ── calibration stub (Phase 5) ────────────────────────────────────────────
+    # ── calibration (Phase 5) ─────────────────────────────────────────────────
 
-    def runSetupProcedure(self, calibration_args: Any = None) -> int:
-        return EyeTrackerConstants.EYETRACKER_INTERFACE_METHOD_NOT_SUPPORTED
+    def runSetupProcedure(self, calibration_args: Any = None) -> Any:  # noqa: C901
+        """PsychoPy-driven Eye Tribe calibration.
+
+        Opens a full-screen window, presents animated targets for each calibration
+        point, sequences the Eye Tribe calibration protocol via
+        :class:`~.calibration.CalibrationSequencer`, parses the result, shows an
+        accuracy summary, and offers accept / redo.  Restores the pre-calibration
+        state (closes the calibration window) on exit.
+
+        Returns
+        -------
+        ``EyeTrackerConstants.EYETRACKER_OK`` (200) on accept,
+        ``EyeTrackerConstants.EYETRACKER_CALIBRATION_ERROR`` (203) on abort.
+        """
+        try:
+            import psychopy.event as pp_event
+            import psychopy.visual as pp_visual
+        except ImportError:
+            log.error("PsychoPy not available; cannot run calibration")
+            return EyeTrackerConstants.EYETRACKER_INTERFACE_METHOD_NOT_SUPPORTED
+
+        from .calibration import (
+            DEFAULT_TARGET_COUNT,
+            SUPPORTED_TARGET_COUNTS,
+            CalibrationSequencer,
+            parse_calibresult,
+            point_layout,
+        )
+
+        config = self.getConfiguration()
+        calib_cfg = config.get("calibration", {})
+        target_count = int(calib_cfg.get("target_count", DEFAULT_TARGET_COUNT))
+        if target_count not in SUPPORTED_TARGET_COUNTS:
+            log.warning(
+                "calibration.target_count %d unsupported; using %d",
+                target_count,
+                DEFAULT_TARGET_COUNT,
+            )
+            target_count = DEFAULT_TARGET_COUNT
+
+        screen_w = self._screen_w
+        screen_h = self._screen_h
+
+        try:
+            monitor_name = self._display_device.getPsychopyMonitorName()
+            screen_index = self._display_device.getIndex()
+        except AttributeError:
+            monitor_name = "testMonitor"
+            screen_index = 0
+
+        win = pp_visual.Window(
+            size=(screen_w, screen_h),
+            monitor=monitor_name,
+            units="pix",
+            fullscr=True,
+            allowGUI=False,
+            screen=screen_index,
+            color=(-1, -1, -1),
+            colorSpace="rgb",
+        )
+        win.setMouseVisible(False)
+
+        try:
+            return self._run_calib_loop(
+                win, target_count, screen_w, screen_h, pp_event, pp_visual
+            )
+        finally:
+            win.setMouseVisible(True)
+            win.close()
+
+    def _run_calib_loop(
+        self,
+        win: Any,
+        target_count: int,
+        screen_w: int,
+        screen_h: int,
+        pp_event: Any,
+        pp_visual: Any,
+    ) -> Any:
+        """Inner calibration loop; separated from window creation for testability."""
+        from .calibration import CalibrationSequencer, parse_calibresult, point_layout
+
+        settle_s = self._CALIB_SETTLE_S
+        sample_s = self._CALIB_SAMPLE_S
+
+        sequencer = CalibrationSequencer(self._client._request)
+
+        # ── stimuli ────────────────────────────────────────────────────────────
+        outer = pp_visual.Circle(
+            win, radius=30, units="pix", fillColor=(0.8, 0, 0), lineColor=(1, 1, 1), lineWidth=2
+        )
+        inner = pp_visual.Circle(
+            win, radius=8, units="pix", fillColor=(1, 1, 1), lineColor=None
+        )
+        msg_stim = pp_visual.TextStim(
+            win, text="", units="pix", height=28, color=(1, 1, 1), wrapWidth=screen_w * 0.9
+        )
+
+        layout = point_layout(target_count)
+
+        while True:  # redo loop
+            # ── intro screen ───────────────────────────────────────────────────
+            msg_stim.setText(
+                f"Eye Tribe Calibration  ({target_count} points)\n\n"
+                "Look at each dot until it disappears.\n\n"
+                "SPACE  =  start     ESCAPE  =  abort"
+            )
+            while True:
+                msg_stim.draw()
+                win.flip()
+                keys = pp_event.getKeys(["space", "escape"])
+                if "escape" in keys:
+                    return EyeTrackerConstants.EYETRACKER_CALIBRATION_ERROR
+                if "space" in keys:
+                    break
+
+            pp_event.clearEvents()
+            sequencer.start(target_count)
+
+            abort = False
+            last_calibresult_raw: dict[str, Any] | None = None
+
+            for x_norm, y_norm in layout:
+                # Pixel coords for the Eye Tribe API (top-left origin)
+                x_px = x_norm * screen_w
+                y_px = y_norm * screen_h
+                # PsychoPy pix coords (centre origin, Y-up)
+                x_disp = x_px - screen_w / 2.0
+                y_disp = -(y_px - screen_h / 2.0)
+
+                outer.setPos((x_disp, y_disp))
+                inner.setPos((x_disp, y_disp))
+
+                # Settle — participant fixates the target
+                settle_end = time.monotonic() + settle_s
+                while time.monotonic() < settle_end:
+                    outer.draw()
+                    inner.draw()
+                    win.flip()
+                    if pp_event.getKeys(["escape"]):
+                        abort = True
+                        break
+                if abort:
+                    break
+
+                # Sample window — Eye Tribe records gaze
+                sequencer.point_start(x_px, y_px)
+                sample_end = time.monotonic() + sample_s
+                while time.monotonic() < sample_end:
+                    outer.draw()
+                    inner.draw()
+                    win.flip()
+                    if pp_event.getKeys(["escape"]):
+                        abort = True
+                        break
+
+                raw = sequencer.point_end()
+                if raw is not None:
+                    last_calibresult_raw = raw
+
+                if abort:
+                    break
+
+            if abort:
+                sequencer.abort()
+                return EyeTrackerConstants.EYETRACKER_CALIBRATION_ERROR
+
+            # ── accuracy summary ───────────────────────────────────────────────
+            if last_calibresult_raw is not None:
+                result = parse_calibresult(last_calibresult_raw)
+                ok_str = "OK" if result.success else "FAILED"
+                lines = [
+                    f"Calibration {ok_str}  |  Overall: {result.avg_error_deg:.2f}°"
+                ]
+                for i, pt in enumerate(result.per_point, 1):
+                    ad = pt.get("ad", float("nan"))
+                    lines.append(f"  Point {i:2d}: {ad:.2f}°")
+                lines.append("\nSPACE  =  accept     R  =  redo     ESCAPE  =  abort")
+                summary = "\n".join(lines)
+            else:
+                summary = "Calibration complete.\n\nSPACE = accept     R = redo     ESCAPE = abort"
+
+            while True:
+                msg_stim.setText(summary)
+                msg_stim.draw()
+                win.flip()
+                keys = pp_event.getKeys(["space", "r", "escape"])
+                if "space" in keys:
+                    return EyeTrackerConstants.EYETRACKER_OK
+                if "r" in keys:
+                    sequencer.clear()
+                    break  # restart redo loop
+                if "escape" in keys:
+                    return EyeTrackerConstants.EYETRACKER_CALIBRATION_ERROR
 
     # ── polling ───────────────────────────────────────────────────────────────
 

@@ -69,15 +69,28 @@ def mock_srv():
     srv.stop()
 
 
+def _reset_singleton() -> None:
+    """Reset both the base-class and subclass _INSTANCE so a fresh EyeTracker can be built.
+
+    EyeTrackerDevice.__init__ does ``self.__class__._INSTANCE = self``, which stores the
+    instance on the *subclass* (EyeTracker), not the base class.  Clearing only the base
+    class leaves the subclass attribute intact, causing a spurious "already created" error
+    on the next construction.
+    """
+    EyeTrackerDevice._INSTANCE = None
+    if "_INSTANCE" in EyeTracker.__dict__:
+        EyeTracker._INSTANCE = None  # type: ignore[attr-defined]
+
+
 @pytest.fixture
 def tracker(mock_srv):
     """Construct EyeTracker, connect to mock, yield, then clean up singleton."""
-    EyeTrackerDevice._INSTANCE = None
+    _reset_singleton()
     t = EyeTracker(dconfig=_make_dconfig(mock_srv.port))
     t.setConnectionState(True)
     yield t
     t._close()
-    EyeTrackerDevice._INSTANCE = None
+    _reset_singleton()
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -219,7 +232,7 @@ def test_sample_timestamps_advance(tracker):
 
 def test_validity_propagation_tracking_lost():
     """Frames with STATE_TRACKING_LOST produce status=2 events."""
-    EyeTrackerDevice._INSTANCE = None
+    _reset_singleton()
     srv = MockEyeTribeServer(
         port=0,
         frame_rate=30,
@@ -236,7 +249,7 @@ def test_validity_propagation_tracking_lost():
         samples = _sample_events(_drain_events(t))
     finally:
         t._close()
-        EyeTrackerDevice._INSTANCE = None
+        _reset_singleton()
         srv.stop()
 
     assert samples, "No samples"
@@ -246,7 +259,7 @@ def test_validity_propagation_tracking_lost():
 
 def test_validity_propagation_valid_frames():
     """Normal frames (GAZE|EYES|PRESENCE) produce status=0 events."""
-    EyeTrackerDevice._INSTANCE = None
+    _reset_singleton()
     srv = MockEyeTribeServer(port=0, frame_rate=30, heartbeat_interval_ms=3000)
     srv.start()
     try:
@@ -258,7 +271,7 @@ def test_validity_propagation_valid_frames():
         samples = _sample_events(_drain_events(t))
     finally:
         t._close()
-        EyeTrackerDevice._INSTANCE = None
+        _reset_singleton()
         srv.stop()
 
     assert samples
@@ -285,7 +298,7 @@ def test_fixation_start_emitted_on_fix_transition(tracker):
 
 def test_fixation_end_emitted_on_fix_exit():
     """FixationEndEvent is emitted when fix transitions True→False (via lost segment)."""
-    EyeTrackerDevice._INSTANCE = None
+    _reset_singleton()
     # Normal frames for 0.1 s, then lost for 0.3 s (fix goes False)
     srv = MockEyeTribeServer(
         port=0,
@@ -303,7 +316,7 @@ def test_fixation_end_emitted_on_fix_exit():
         events = _drain_events(t)
     finally:
         t._close()
-        EyeTrackerDevice._INSTANCE = None
+        _reset_singleton()
         srv.stop()
 
     fix_ends = _fixend_events(events)
@@ -323,7 +336,7 @@ def test_gaze_source_raw_is_default(tracker):
 
 def test_gaze_source_avg_config():
     """EyeTracker constructed with gaze_source='avg' sets _gaze_source correctly."""
-    EyeTrackerDevice._INSTANCE = None
+    _reset_singleton()
     srv = MockEyeTribeServer(port=0, frame_rate=30, heartbeat_interval_ms=3000)
     srv.start()
     try:
@@ -337,7 +350,7 @@ def test_gaze_source_avg_config():
         assert samples, "No samples with gaze_source='avg'"
     finally:
         t._close()
-        EyeTrackerDevice._INSTANCE = None
+        _reset_singleton()
         srv.stop()
 
 

@@ -260,3 +260,96 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
 - Open issues handed to Phase 5: `runSetupProcedure` still returns
   `EYETRACKER_INTERFACE_METHOD_NOT_SUPPORTED`; calibration sequencing (`calibration.py`) to be
   wired up.  ppd/velocity fields remain UNDEFINED.
+
+## Phase 5 — Calibration via PsychoPy runSetupProcedure  (status: DONE)
+
+- Date: 2026-06-15 / Agent: Claude Sonnet 4.6 / Branch: `phase-5-calibration` / PR: pending
+- Delivered:
+  - `psychopy_eyetracker_eyetribe/eyetribe/calibration.py` — full implementation (PsychoPy-free):
+    - Module constants: `DEFAULT_TARGET_COUNT = 9`, `SUPPORTED_TARGET_COUNTS = (5, 9, 12)`,
+      `SETTLE_MS = 750`, `SAMPLE_MS = 1000`.
+    - `_LAYOUTS` dict with normalized (x, y) positions for 5-, 9-, and 12-point layouts; origin
+      top-left, values in [0, 1]; centre-first so an early abort leaves the device in a defined state.
+    - Frozen `CalibrationResult(success, avg_error_deg, per_point)` dataclass.
+    - `point_layout(target_count) -> tuple[tuple[float, float], ...]` — validates count and
+      returns layout; raises `ValueError` on unsupported counts.
+    - `parse_calibresult(payload) -> CalibrationResult` — converts the Eye Tribe `calibresult`
+      object (from `pointend` reply's `values.calibresult`) to a typed result; tolerates missing
+      keys by defaulting to `False`/`0.0`/`()`.
+    - `_RequestFn = Callable[[dict], dict]` type alias.
+    - `CalibrationSequencer(request_fn)` — drives the protocol:
+      `start(point_count)` → N × `(point_start(x_px, y_px)` → `point_end())` → optionally
+      `abort()` or `clear()`.  `point_end()` returns the raw `calibresult` dict or `None`.
+  - `psychopy_eyetracker_eyetribe/mock/mock_server.py` — calibration recording extension:
+    - `_ClientHandler` gains `calib_log` and `calib_log_lock` constructor args; logs every
+      calibration request (request type + values) under the lock.
+    - `MockEyeTribeServer` gains `get_calib_log()` and `clear_calib_log()` thread-safe methods.
+    - `_accept_loop` passes its shared log and lock to every new `_ClientHandler`.
+  - `psychopy_eyetracker_eyetribe/eyetribe/eyetracker.py` — `runSetupProcedure` fully implemented:
+    - Class timing attributes `_CALIB_SETTLE_S = 0.750` and `_CALIB_SAMPLE_S = 1.000` (overridable
+      to `0.0` in tests to skip timing loops).
+    - `runSetupProcedure(calibration_args)`: opens a `visual.Window` (full-screen); runs
+      `_run_calib_loop`; closes window in `finally`; returns `EYETRACKER_OK` or
+      `EYETRACKER_CALIBRATION_ERROR`.
+    - `_run_calib_loop(win, target_count, sequencer)`:
+      - Intro screen (`getKeys(["space", "escape"])` → proceed or abort).
+      - Outer redo loop: `sequencer.start(target_count)` → iterate layout → for each point:
+        convert normalized coords to Eye Tribe pixels and PsychoPy pixel-unit position; settle
+        loop (`time.monotonic()` + `win.flip()` + `getKeys(["escape"])`); `point_start`; sample
+        loop; `point_end`; collect last `calibresult`.
+      - On escape at any point: `sequencer.abort()`, return `EYETRACKER_CALIBRATION_ERROR`.
+      - Summary screen after all points: shows success/error-deg; `getKeys(["space", "r", "escape"])`
+        → space accepts (`EYETRACKER_OK`), r calls `sequencer.clear()` and redoes, escape aborts.
+    - Target rendering: outer `Circle(r=30, fillColor="white")`, inner `Circle(r=8,
+      fillColor="black")`; `TextStim` for intro/summary messages.
+  - `tests/unit/test_calibration.py` — 40 unit tests (all PsychoPy-free, no network):
+    - Constants (3 tests): `DEFAULT_TARGET_COUNT`, `SUPPORTED_TARGET_COUNTS`, timing constants.
+    - `point_layout` (7 tests): correct count for 5/9/12; all values in [0,1]; no duplicates;
+      `ValueError` on 5 invalid counts.
+    - `parse_calibresult` (6 tests): success, failure, per-point fields, empty calibpoints,
+      missing keys, immutability (`frozen=True` raises on assignment).
+    - `CalibrationSequencer` (24 tests): individual method message shapes; `point_end` returns
+      calibresult or `None`; full 5/9/12 sequences (message order + result parsing); abort path;
+      redo (clear) path; pixel coord forwarding; `start` uses given point count.
+  - `tests/integration/test_calibration_against_mock.py` — 14 integration tests:
+    - Part A (7 tests) — `CalibrationSequencer` against a real `MockEyeTribeServer`:
+      parametrized 5/9/12 message-sequence and result-parsing tests; abort message sequence;
+      redo (clear → start again) message sequence; coordinate forwarding verified via calib log.
+    - Part B (7 tests) — `runSetupProcedure` with mocked PsychoPy visual layer:
+      `sys.modules` patching for `psychopy.visual`; `_reset_singleton()` in setup/teardown;
+      timing class attrs overridden to `0.0`; key sequences injected via `side_effect` lists;
+      tests: success flow, abort at intro, abort at summary, redo-then-accept, window-close
+      verification (direct `_run_calib_loop` call + `runSetupProcedure` with window capture).
+  - `tests/integration/test_eyetracker_against_mock.py` — pre-existing singleton bug fixed:
+    - Added `_reset_singleton()` helper (clears both `EyeTrackerDevice._INSTANCE` and
+      `EyeTracker._INSTANCE` if present in `EyeTracker.__dict__`).
+    - Updated `tracker` fixture and all 4 inline test functions that created their own
+      `MockEyeTribeServer` instances to use `_reset_singleton()` in setup and teardown.
+- Acceptance criteria:
+  - PASS — `CalibrationSequencer` emits the correct message sequence against the mock:
+    `start` → N × `(pointstart, pointend)` verified for 5, 9, and 12 points.
+  - PASS — `parse_calibresult` round-trips `success`, `avg_error_deg`, and per-point dicts
+    for both success and failure payloads; tolerates missing keys.
+  - PASS — `runSetupProcedure` returns `EYETRACKER_OK` on success, `EYETRACKER_CALIBRATION_ERROR`
+    on escape; window is closed in all exit paths.
+  - PASS — redo path: `clear` + restart sequence confirmed in both unit and integration tests.
+  - PASS — ruff/black/isort clean; mypy strict passes on PsychoPy-free core.
+  - PASS — full pytest suite: **229 passed, 4 skipped** in 22.74 s.
+- Deviations from plan:
+  - Did not inherit from `BaseCalibrationProcedure` — PsychoPy's base class uses `gevent` and
+    is not directly usable for the Eye Tribe protocol.  Wrote a standalone display loop instead.
+  - Mock server's `pointend` reply includes `calibresult` on every call (not just final), while
+    the real server only returns it on the last `pointend`.  `_run_calib_loop` tracks
+    `last_calibresult_raw` and only uses the final value, making it correct for both.
+  - Singleton teardown bug in `test_eyetracker_against_mock.py` was pre-existing (present before
+    Phase 5 changes); fixed as part of this phase rather than handing forward.
+- Verified facts:
+  - `EyeTrackerDevice.__init__` sets `self.__class__._INSTANCE = self` on the *subclass*
+    (`EyeTracker`), not the base class.  Clearing only `EyeTrackerDevice._INSTANCE` leaves the
+    subclass attribute stale.  `_reset_singleton()` must clear both.
+  - Eye Tribe calibration protocol: `calibration start {pointcount}` → N ×
+    (`pointstart {x,y}` → `pointend` returning `calibresult`) → optional `abort` or `clear`.
+  - `EyeTrackerConstants.EYETRACKER_OK = 200`, `EYETRACKER_CALIBRATION_ERROR = 203`.
+- Open issues handed to Phase 6: ppd/velocity fields remain UNDEFINED; `runSetupProcedure`
+  does not yet adapt to the PsychoPy display device (uses raw pixel coords from Eye Tribe server
+  resolution); no live accuracy feedback is shown on the summary screen.
