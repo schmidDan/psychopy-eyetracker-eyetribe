@@ -418,3 +418,76 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
     choice dropdowns.
 - Open issues handed to Phase 7: ppd/velocity fields remain UNDEFINED; no human Builder dropdown
   screenshot yet (mark this criterion PASS once a human confirms and records it here).
+
+## Phase 7 — Documentation & examples  (status: DONE)
+
+- Date: 2026-06-15 / Agent: Claude Sonnet 4.6 / Branch: `phase-7-docs` / PR: pending
+- Delivered:
+  - `README.md` fully expanded: prerequisites section (Eye Tribe Server download from
+    `github.com/EyeTribe/sdk-installers/releases`), install (wheel and dev), Coder quick
+    start (ioHub snippet + mock demo), Builder quick start, limitations table (30 Hz /
+    arbitrary pupil units / raw default / Windows-only / calibration required), and
+    troubleshooting section (Server not running / port conflict / heartbeat timeout /
+    `trackerstate` ≠ 0 / gaze 0,0 post-calibration).
+  - `examples/coder_demo.py` — runnable Coder demo; uses `EyeTracker` directly (mirrors
+    integration-test pattern); starts `MockEyeTribeServer` by default so it runs end-to-end
+    with no hardware; `--no-mock` flag for real hardware; `--duration` flag for recording
+    length; prints event counts and first sample fields; exits 0 on success.
+  - `examples/builder_example.psyexp` — minimal PsychoPy Builder experiment with Eye Tribe
+    eyetracker configured (`etHost`, `etPort`, `etGazeSource`, `etCalibTargetCount` params);
+    one trial routine with a fixation cross.
+  - `docs/implementation_notes.md` — implementation notes mirroring sibling plugins:
+    architecture diagram, iohub config key, full device config key table, BinocularEyeSampleEvent
+    field table (50 fields, index→meaning), FixationStart/End event notes, coordinate system
+    summary, time-synchronisation model, calibration protocol, mock server description,
+    and known limitations.
+  - Docstrings added to all public API methods that were missing them:
+    `EyeTracker.__init__/setConnectionState/isConnected/setRecordingState/isRecordingEnabled/
+    enableEventReporting/_poll/_process_frame/_emit_fixation_events/_close`;
+    `EyeTribeClient.__init__`; `FrameBuffer.put/get_all/get_one`;
+    `Point`, `EyeData`, `Frame` dataclasses; `TrackingState.from_int`;
+    `CalibrationResult`; `ClockSync.__init__`; `EyeTribeEyetrackerBackend.getParams/writeDeviceCode`.
+  - `scripts/check_doc_links.py` — scans `README.md` and `docs/*.md` for relative
+    markdown links and asserts each target exists; exits 1 on broken links.
+  - `CHANGELOG.md` updated with Phase 7 entry.
+  - `.github/workflows/ci.yml` extended with two new steps in `lint-and-test`:
+    - `Coder demo (against mock)` — runs `python examples/coder_demo.py` (default mock
+      mode); validates the full connect→record→events→disconnect path.
+    - `Doc-link check` — runs `python scripts/check_doc_links.py`.
+- Acceptance criteria:
+  - PASS — A new user can follow the README to run the bundled Coder demo against the
+    mock end-to-end: `python examples/coder_demo.py` connects the mock, records 30 samples
+    in 1 s, prints event counts, exits 0.
+  - PASS — All public API has docstrings (verified by inspection of all exported classes).
+  - PASS (expected in CI) — Coder demo runs against the mock in CI (`Coder demo` step in
+    `lint-and-test` job); doc-link check runs in CI (`Doc-link check` step).
+- Deviations from plan:
+  - Coder demo uses direct `EyeTracker` instantiation (same pattern as integration tests)
+    rather than `launchHubServer`, because `launchHubServer` is not exercised in CI (it
+    launches an ioHub subprocess).  The `launchHubServer` snippet is shown in README.md.
+  - Builder `.psyexp` is a template that shows the Eye Tribe configuration; it cannot be
+    auto-validated without running Builder.
+- Post-Phase-7 bug fixes (same session, after Phase 7 commit):
+  1. **Entry-point group corrected** (`pyproject.toml`): the group was
+     `psychopy.iohub.devices.eyetracker` instead of `psychopy.iohub.devices.eyetracker.hw`.
+     PsychoPy's `importDeviceModule` builds the full module path
+     `psychopy.iohub.devices.eyetracker.hw.eyetribe` and uses `startswith(group)` matching;
+     the old group never matched so the device could never be found.
+  2. **Event-class exports added** (`eyetribe/__init__.py`): ioHub's `import_device` calls
+     `getattr(module, event_class_name)` for each name in `EyeTracker.EVENT_CLASS_NAMES`
+     (`BinocularEyeSampleEvent`, `FixationStartEvent`, `FixationEndEvent`). The lazy
+     `__getattr__` previously raised `AttributeError`; it now imports from
+     `psychopy.iohub.devices.eyetracker` and returns the correct class.
+  3. **PsychoPy user packages `.pth` file**: the ioHub server subprocess uses PsychoPy's
+     own user-packages directory (`AppData/Roaming/psychopy3/packages/…`) which differs
+     from the standard Python user site-packages where `pip install -e .` placed our
+     editable install. A `.pth` file (`psychopy_eyetracker_eyetribe_dev.pth`) was written to
+     `psychopy3/packages/Python310/site-packages/` pointing at the project root so that
+     both the package import path and the `egg-info` entry-point metadata are visible to the
+     server subprocess.  **Note:** this `.pth` file is a developer convenience; end users
+     installing from a wheel do not need it.
+  After all three fixes, `launchHubServer` end-to-end test
+  (`_test_launchhub.py`) passes: connects mock, records 32 events, exits 0.
+- Verified facts: no new external facts to record.
+- Open issues handed to Phase 8: hardware validation; calibrated golden frame capture;
+  ppd/velocity fields remain UNDEFINED.

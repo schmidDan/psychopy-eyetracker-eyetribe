@@ -60,6 +60,8 @@ _LAYOUTS: dict[int, tuple[tuple[float, float], ...]] = {
 
 @dataclass(frozen=True)
 class CalibrationResult:
+    """Parsed result from the Eye Tribe ``calibresult`` payload."""
+
     success: bool
     avg_error_deg: float
     per_point: tuple[dict[str, Any], ...]

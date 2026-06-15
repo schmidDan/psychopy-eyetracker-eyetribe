@@ -38,7 +38,7 @@ where = ["", "psychopy_eyetracker_eyetribe"]
 [tool.setuptools.package-data]
 "*" = ["*.yaml"]
 
-[project.entry-points."psychopy.iohub.devices.eyetracker"]
+[project.entry-points."psychopy.iohub.devices.eyetracker.hw"]
 eyetribe = "psychopy_eyetracker_eyetribe.eyetribe"
 
 [project.entry-points."psychopy.experiment.components.settings.eyetracking"]
