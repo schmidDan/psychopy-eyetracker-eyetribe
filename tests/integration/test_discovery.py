@@ -14,7 +14,7 @@ import pytest
 
 
 def test_iohub_entry_point_registered():
-    eps = entry_points(group="psychopy.iohub.devices.eyetracker")
+    eps = entry_points(group="psychopy.iohub.devices.eyetracker.hw")
     mapping = {ep.name: ep.value for ep in eps}
     assert mapping.get("eyetribe") == "psychopy_eyetracker_eyetribe.eyetribe"
 

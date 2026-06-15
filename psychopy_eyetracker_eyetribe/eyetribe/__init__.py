@@ -11,7 +11,10 @@ from __future__ import annotations
 
 from typing import Any
 
-__all__ = ["EyeTracker"]
+__all__ = ["EyeTracker", "BinocularEyeSampleEvent", "FixationStartEvent", "FixationEndEvent"]
+
+# Event class names that ioHub's import_device requests from this module at load time.
+_IOHUB_EVENT_CLASSES = {"BinocularEyeSampleEvent", "FixationStartEvent", "FixationEndEvent"}
 
 
 def __getattr__(name: str) -> Any:
@@ -19,4 +22,17 @@ def __getattr__(name: str) -> Any:
         from .eyetracker import EyeTracker
 
         return EyeTracker
+    if name in _IOHUB_EVENT_CLASSES:
+        from psychopy.iohub.devices.eyetracker import (
+            BinocularEyeSampleEvent,
+            FixationEndEvent,
+            FixationStartEvent,
+        )
+
+        _cls_map = {
+            "BinocularEyeSampleEvent": BinocularEyeSampleEvent,
+            "FixationStartEvent": FixationStartEvent,
+            "FixationEndEvent": FixationEndEvent,
+        }
+        return _cls_map[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

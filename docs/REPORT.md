@@ -467,6 +467,27 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
     launches an ioHub subprocess).  The `launchHubServer` snippet is shown in README.md.
   - Builder `.psyexp` is a template that shows the Eye Tribe configuration; it cannot be
     auto-validated without running Builder.
+- Post-Phase-7 bug fixes (same session, after Phase 7 commit):
+  1. **Entry-point group corrected** (`pyproject.toml`): the group was
+     `psychopy.iohub.devices.eyetracker` instead of `psychopy.iohub.devices.eyetracker.hw`.
+     PsychoPy's `importDeviceModule` builds the full module path
+     `psychopy.iohub.devices.eyetracker.hw.eyetribe` and uses `startswith(group)` matching;
+     the old group never matched so the device could never be found.
+  2. **Event-class exports added** (`eyetribe/__init__.py`): ioHub's `import_device` calls
+     `getattr(module, event_class_name)` for each name in `EyeTracker.EVENT_CLASS_NAMES`
+     (`BinocularEyeSampleEvent`, `FixationStartEvent`, `FixationEndEvent`). The lazy
+     `__getattr__` previously raised `AttributeError`; it now imports from
+     `psychopy.iohub.devices.eyetracker` and returns the correct class.
+  3. **PsychoPy user packages `.pth` file**: the ioHub server subprocess uses PsychoPy's
+     own user-packages directory (`AppData/Roaming/psychopy3/packages/…`) which differs
+     from the standard Python user site-packages where `pip install -e .` placed our
+     editable install. A `.pth` file (`psychopy_eyetracker_eyetribe_dev.pth`) was written to
+     `psychopy3/packages/Python310/site-packages/` pointing at the project root so that
+     both the package import path and the `egg-info` entry-point metadata are visible to the
+     server subprocess.  **Note:** this `.pth` file is a developer convenience; end users
+     installing from a wheel do not need it.
+  After all three fixes, `launchHubServer` end-to-end test
+  (`_test_launchhub.py`) passes: connects mock, records 32 events, exits 0.
 - Verified facts: no new external facts to record.
 - Open issues handed to Phase 8: hardware validation; calibrated golden frame capture;
   ppd/velocity fields remain UNDEFINED.
