@@ -1,0 +1,20 @@
+eyetracker.hw.eyetribe.EyeTracker:
+    name: tracker
+    enable: True
+    save_events: True
+    stream_events: True
+    auto_report_events: False
+    event_buffer_length: 1024
+    device_timer:
+        interval: 0.005
+    monitor_event_types: [BinocularEyeSampleEvent, FixationStartEvent, FixationEndEvent]
+    host: 127.0.0.1
+    port: 6555
+    api_version: 1
+    gaze_source: raw
+    runtime_settings:
+        sampling_rate: auto
+        track_eyes: BINOCULAR
+    calibration:
+        target_count: 9
+    manufacturer_name: The Eye Tribe

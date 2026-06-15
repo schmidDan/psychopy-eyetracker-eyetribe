@@ -1,0 +1,20 @@
+eyetracker.hw.eyetribe.EyeTracker:
+    name: IOHUB_STRING
+    enable: IOHUB_BOOL
+    save_events: IOHUB_BOOL
+    stream_events: IOHUB_BOOL
+    auto_report_events: IOHUB_BOOL
+    event_buffer_length: IOHUB_INT
+    device_timer:
+        interval: IOHUB_FLOAT
+    monitor_event_types: IOHUB_LIST
+    host: IOHUB_STRING
+    port: IOHUB_INT
+    api_version: [1]
+    gaze_source: [raw, avg]
+    runtime_settings:
+        sampling_rate: [auto, 30, 60]
+        track_eyes: [BINOCULAR]
+    calibration:
+        target_count: [5, 9, 12]
+    manufacturer_name: IOHUB_STRING

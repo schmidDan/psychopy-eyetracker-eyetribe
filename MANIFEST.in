@@ -1,0 +1,2 @@
+include LICENSE README.md CHANGELOG.md
+recursive-include psychopy_eyetracker_eyetribe *.yaml

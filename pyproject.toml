@@ -1,0 +1,81 @@
+[build-system]
+requires = ["setuptools>=40.8.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "psychopy-eyetracker-eyetribe"
+version = "0.1.0"
+description = "PsychoPy ioHub eye-tracker plugin for The Eye Tribe (ET1000)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "GNU General Public License v3 (GPLv3)" }
+authors = [{ name = "Daniel Schmid", email = "daniel.-schmid@web.de" }]
+keywords = ["psychopy", "iohub", "eyetracker", "eye tracking", "the eye tribe", "et1000"]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+  "Operating System :: Microsoft :: Windows",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Topic :: Scientific/Engineering",
+]
+dependencies = ["numpy"]
+
+[project.optional-dependencies]
+tests = ["psychopy", "pytest", "pytest-cov", "pyyaml"]
+dev = ["psychopy", "pytest", "pytest-cov", "pyyaml", "ruff", "black", "isort", "mypy", "pre-commit", "build"]
+
+[project.urls]
+homepage = "https://github.com/schmidDan/psychopy-eyetracker-eyetribe"
+repository = "https://github.com/schmidDan/psychopy-eyetracker-eyetribe"
+changelog = "https://github.com/schmidDan/psychopy-eyetracker-eyetribe/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["", "psychopy_eyetracker_eyetribe"]
+
+[tool.setuptools.package-data]
+"*" = ["*.yaml"]
+
+[project.entry-points."psychopy.iohub.devices.eyetracker"]
+eyetribe = "psychopy_eyetracker_eyetribe.eyetribe"
+
+[project.entry-points."psychopy.experiment.components.settings.eyetracking"]
+EyeTribeEyetrackerBackend = "psychopy_eyetracker_eyetribe.eyetribe.settings:EyeTribeEyetrackerBackend"
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+# Strict type-checking is scoped to the PsychoPy-free core and is ENABLED FROM PHASE 1,
+# once real code lands (see docs/DEVELOPMENT_PLAN.md section 6). The stubs are typed but
+# the gate is not run in Phase 0 CI.
+[tool.mypy]
+python_version = "3.10"
+strict = true
+files = [
+  "psychopy_eyetracker_eyetribe/eyetribe/eyetribe_client.py",
+  "psychopy_eyetracker_eyetribe/eyetribe/frames.py",
+  "psychopy_eyetracker_eyetribe/eyetribe/transforms.py",
+  "psychopy_eyetracker_eyetribe/eyetribe/time_sync.py",
+  "psychopy_eyetracker_eyetribe/eyetribe/calibration.py",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "integration: launches a real ioHub server (requires PsychoPy)",
+  "hardware: manual test requiring the ET1000 + Eye Tribe Server",
+]
+
+[tool.coverage.run]
+source = ["psychopy_eyetracker_eyetribe.eyetribe"]
