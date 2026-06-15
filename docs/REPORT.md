@@ -116,3 +116,74 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
   `time_ms` as specified.
 - Open issues handed to Phase 3: wire `parse_frame` into `EyeTribeClient.ReaderThread`; implement
   `EyeTracker._poll()` to drain `FrameBuffer` and emit `BinocularEyeSampleEvent`.
+
+## Phase 3 — EyeTracker device (recording, polling, event emission)  (status: DONE)
+
+- Date: 2026-06-15 / Agent: Claude Sonnet 4.6 / Branch: `phase-3-eyetracker` / PR: pending
+- Delivered:
+  - `psychopy_eyetracker_eyetribe/eyetribe/eyetracker.py` — full `EyeTracker(EyeTrackerDevice)`
+    implementation:
+    - `__init__`: reads `host`, `port`, `gaze_source` from config; constructs `EyeTribeClient`;
+      initialises `_recording`, `_time_offset`, fixation-state tracker variables.
+    - `setConnectionState`/`isConnected`: delegates to `EyeTribeClient.connect()`/`close()`/`state`.
+    - `setRecordingState`/`isRecordingEnabled`: toggles `_recording`; sets `_is_reporting_events`
+      directly (avoids `clearEvents()` → `_iohub_server.processDeviceEvents()` in test context).
+    - `enableEventReporting`: delegates to `setRecordingState`.
+    - `runSetupProcedure`: returns `EYETRACKER_INTERFACE_METHOD_NOT_SUPPORTED` (Phase 5 stub).
+    - `_poll()`: drains `EyeTribeClient.frame_buffer.get_all()`, calls `parse_frame()` on each,
+      skips `FrameParseError` with warning, delegates to `_process_frame()`.
+    - `_process_frame()`: computes `device_time` (ms→s), captures `_time_offset` on first frame
+      (interim: `offset = logged_time − device_time`; Phase 4 replaces with `time_sync.py`);
+      passes left/right/combined gaze through `_eyeTrackerToDisplayCoords` (pixel pass-through in
+      tests; Phase 4 adds display transform); builds 50-field `BinocularEyeSampleEvent` list and
+      calls `_addNativeEventToBuffer`; delegates to `_emit_fixation_events`.
+    - `_emit_fixation_events()`: state machine on `_last_fix` / `frame.fix`; emits 29-field
+      `FixationStartEvent` on False→True transition; emits 65-field `FixationEndEvent` (with
+      duration, averaged gaze/pupil) on True→False transition.
+    - `trackerTime()`/`trackerSec()`: estimate current tracker time from `_time_offset`; Phase 4 will
+      use `time_sync.py`.
+    - `_eyeTrackerToDisplayCoords` / `_displayToEyeTrackerCoords`: try `_display_device.*` methods;
+      fall through to pixel pass-through on `AttributeError` (test harness safety).
+    - `_close()`: stops recording, disconnects, calls base `_close()`.
+  - `psychopy_eyetracker_eyetribe/eyetribe/default_eyetracker.yaml` — added `model_name: ET1000`
+    and `device_number: 0` (required by `ioObject.__init__` CLASS_ATTRIBUTE_NAMES iteration).
+  - `psychopy_eyetracker_eyetribe/eyetribe/supported_config_settings.yaml` — added `model_name:
+    IOHUB_STRING` and `device_number: 0`.
+  - `tests/integration/test_eyetracker_against_mock.py` — 16 integration tests covering:
+    connection lifecycle, recording-state toggle, event generation on poll (≥5 events after 0.4 s),
+    absence of events when not recording, BinocularEyeSampleEvent field count (50), field ranges
+    (gaze coords, pcenter 0-1, pupil >0, PUPIL_AREA type), monotonically-increasing timestamps,
+    validity propagation (status=0 for valid frames, status=2 for TRACKING_LOST frames),
+    FixationStartEvent on first poll (29 fields), FixationEndEvent on fix→lost transition (65 fields,
+    positive duration), gaze_source config (`"raw"` default, `"avg"` accepted), and
+    `trackerTime()`/`trackerSec()` return types and consistency.
+- Acceptance criteria:
+  - PASS — `_poll()` drains `frame_buffer` and emits one `BinocularEyeSampleEvent` per frame.
+  - PASS — `BinocularEyeSampleEvent` is a 50-field list, `FixationStartEvent` 29-field,
+    `FixationEndEvent` 65-field; field types and ranges verified.
+  - PASS — `FixationStartEvent` emitted on False→True `fix` transition; `FixationEndEvent` on
+    True→False; duration field positive.
+  - PASS — status=0 for valid frames (STATE_TRACKING_GAZE set, no FAIL/LOST); status=2 for
+    TRACKING_LOST frames.
+  - PASS — `gaze_source: "raw"` (default) and `"avg"` both produce events.
+  - PASS — ruff/black/isort clean; pytest 112 passed, 2 skipped (integration tests skip locally
+    without PsychoPy — they run in CI via `pip install -e .[dev]`).
+- Deviations from plan:
+  - `_is_reporting_events` set directly in `setRecordingState` rather than calling
+    `EyeTrackerDevice.enableEventReporting`, because the base implementation calls
+    `clearEvents()` → `_iohub_server.processDeviceEvents()` which fails when `_iohub_server` is
+    None (test context without full ioHub).
+  - `EyeTracker` does not define `__slots__`; Python gives the subclass a `__dict__` when the
+    parent has `__slots__` but the child does not, allowing all instance attributes to be set.
+- Verified facts:
+  - `BinocularEyeSampleEvent.CLASS_ATTRIBUTE_NAMES` has exactly 50 fields (confirmed from installed
+    PsychoPy source); `FixationStartEvent` 29 fields; `FixationEndEvent` 65 fields.
+  - `EyeTrackerConstants.BINOCULAR_EYE_SAMPLE = 52`, `FIXATION_START = 53`, `FIXATION_END = 54`.
+  - `EyeTrackerDevice._INSTANCE` is a singleton; must be set to None before and after each
+    test instantiation.
+  - Mock server emits `fix=True` whenever `STATE_TRACKING_GAZE` is set; `fix=False` for
+    LOST/FAIL segments (confirmed by reading `mock_server.py:_make_frame`).
+  - `EyeTribeClient` sends heartbeats every `heartbeat_interval_ms / 2` ms; tests ≤0.6 s
+    complete well within the 3 s heartbeat window.
+- Open issues handed to Phase 4: coordinate transform (pixel pass-through → `transforms.py`);
+  time-sync model (fixed offset → `time_sync.py`); ppd / velocity fields (currently UNDEFINED).

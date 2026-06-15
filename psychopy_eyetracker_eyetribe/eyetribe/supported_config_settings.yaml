@@ -18,3 +18,5 @@ eyetracker.hw.eyetribe.EyeTracker:
     calibration:
         target_count: [5, 9, 12]
     manufacturer_name: IOHUB_STRING
+    model_name: IOHUB_STRING
+    device_number: 0
