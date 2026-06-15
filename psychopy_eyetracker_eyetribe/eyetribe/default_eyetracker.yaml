@@ -18,3 +18,5 @@ eyetracker.hw.eyetribe.EyeTracker:
     calibration:
         target_count: 9
     manufacturer_name: The Eye Tribe
+    model_name: ET1000
+    device_number: 0

@@ -145,6 +145,8 @@ class _ClientHandler(threading.Thread):
         segments: list[_Segment],
         calib_result: Optional[dict[str, Any]],
         on_disconnect: Callable[[], None],
+        calib_log: Optional[list[dict[str, Any]]] = None,
+        calib_log_lock: Optional[threading.Lock] = None,
     ) -> None:
         super().__init__(daemon=True, name=f"MockClientHandler-{addr}")
         self._conn = conn
@@ -156,6 +158,8 @@ class _ClientHandler(threading.Thread):
         self._segments = segments
         self._calib_result = calib_result
         self._on_disconnect = on_disconnect
+        self._calib_log = calib_log
+        self._calib_log_lock = calib_log_lock
 
         self._push_mode = False
         self._stop_evt = threading.Event()
@@ -244,6 +248,9 @@ class _ClientHandler(threading.Thread):
                 self._reply_err("tracker", req)
 
         elif cat == "calibration":
+            if self._calib_log is not None and self._calib_log_lock is not None:
+                with self._calib_log_lock:
+                    self._calib_log.append({"request": req, "values": vals})
             if req == "start":
                 self._reply_ok("calibration", "start")
             elif req == "pointstart":
@@ -398,6 +405,8 @@ class MockEyeTribeServer:
         self._stop_evt = threading.Event()
         self._clients: list[_ClientHandler] = []
         self._clients_lock = threading.Lock()
+        self._calib_log: list[dict[str, Any]] = []
+        self._calib_log_lock = threading.Lock()
 
     # ── context-manager ───────────────────────────────────────────────────────
 
@@ -449,6 +458,16 @@ class MockEyeTribeServer:
         """Replace the segment list (affects new frames immediately)."""
         self._segments = segments
 
+    def get_calib_log(self) -> list[dict[str, Any]]:
+        """Return a snapshot of recorded calibration messages (thread-safe)."""
+        with self._calib_log_lock:
+            return list(self._calib_log)
+
+    def clear_calib_log(self) -> None:
+        """Clear the calibration message log."""
+        with self._calib_log_lock:
+            self._calib_log.clear()
+
     # ── internal ──────────────────────────────────────────────────────────────
 
     def _accept_loop(self) -> None:
@@ -472,6 +491,8 @@ class MockEyeTribeServer:
                 segments=self._segments,
                 calib_result=self._calib_result,
                 on_disconnect=lambda: self._remove_client(handler),
+                calib_log=self._calib_log,
+                calib_log_lock=self._calib_log_lock,
             )
             with self._clients_lock:
                 self._clients.append(handler)
@@ -524,6 +545,10 @@ __all__ = [
     "STATE_TRACKING_PRESENCE",
     "STATE_TRACKING_FAIL",
     "STATE_TRACKING_LOST",
+    "DEFAULT_FRAME_RATE",
+    "DEFAULT_HEARTBEAT_INTERVAL_MS",
+    "DEFAULT_SCREEN_W",
+    "DEFAULT_SCREEN_H",
 ]
 
 # keep Iterator import quiet if unused externally

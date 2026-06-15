@@ -27,3 +27,20 @@ jobs:
         run: mypy
       - name: Pytest
         run: pytest -m "not hardware" -q --cov=psychopy_eyetracker_eyetribe.eyetribe.eyetribe_client --cov=psychopy_eyetracker_eyetribe.mock.mock_server --cov-report=term-missing --cov-fail-under=90
+
+  wheel-smoke:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Build wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+      - name: Install wheel into clean env (no source tree)
+        shell: bash
+        run: pip install pyyaml pytest dist/*.whl
+      - name: Smoke-test — entry points, YAML, settings backend
+        run: pytest tests/integration/test_discovery.py -q -m "not integration"
