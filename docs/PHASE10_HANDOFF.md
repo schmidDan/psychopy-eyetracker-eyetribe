@@ -64,13 +64,11 @@ order below**. Everything is PsychoPy-free or CI-only — no ET1000, no hardware
 5. **Remove the stale `pyproject.toml` comment** above `[tool.mypy]`
    ("Strict type-checking … ENABLED FROM PHASE 1 … not run in Phase 0 CI") — obsolete.
 
-6. **Documentation + commit staged doc fixes.**
+6. **Documentation.**
    - Document the `(0,0)` / no-gaze behaviour **prominently in `README.md`** (Limitations): the plugin
      drops the Eye Tribe's `(0,0)` "no-gaze" sentinel as invalid (`status = 2`), so analysis never sees
      phantom samples at the screen origin.
    - Add the same note to `docs/implementation_notes.md`.
-   - The working tree already contains doc-consistency fixes from the review (stale `transforms.py`
-     references removed in `DEVELOPMENT_PLAN.md` §6 and `ARCHITECTURE.md`); include them in this PR.
 
 ## Acceptance criteria
 - Reconnect test triggers the real EOF→reconnect path and asserts reconnection + stable thread count;
