@@ -1,57 +1,93 @@
 # Phase 10 handoff prompt
 
-Copy the fenced block below to brief the Phase 10 operator/agent.
+Copy the fenced block below to brief the Phase 10 coding agent.
 
-**Prerequisite:** Phase 9 merged (coordinate fix + launchHubServer regression test green).
-**Environment:** Windows + Eye Tribe Server + ET1000. This is the hardware-validation & release phase;
-the validation **tooling already exists** (Phase 8) — Phase 10 *runs* it on real hardware. Mostly human
-labour (see `docs/HUMAN_TASKS.md`, Phase 10); an agent's role is limited to small fixes if a script
-misbehaves and to writing up results.
+**Prerequisite:** Phase 9 merged. **Environment:** Python 3.10 (+ PsychoPy for the PsychoPy-gated tests,
+which CI installs). All work is software + CI — no ET1000, no hardware.
 
 ---
 
 ````
-You are carrying out **Phase 10 — Hardware validation & release on the ET1000** of
-`psychopy-eyetracker-eyetribe`. Phases 0–9 are merged. The validation scripts and the PsychoPy-free
-metrics helper already exist and are mock-verified (Phase 8); your job is to run them on the real
-device (after the Phase 9 fixes), record the results, capture a calibrated golden frame, reconcile any
-real-frame differences, and tag the release.
+You are implementing **Phase 10 — Post-review fixes & hardening** of `psychopy-eyetracker-eyetribe`.
+Phases 0–9 are merged. A pre-Phase-11 codebase review found a small set of issues; fix them **in the
+order below**. Everything is PsychoPy-free or CI-only — no ET1000, no hardware.
 
 ## Read first
-- `docs/DEVELOPMENT_PLAN.md` — the **Phase 10** section and §2 (discrepancy procedure).
-- `docs/hardware_validation.md` — the checklist + results template to fill in.
-- `docs/REFERENCES.md` — the `[TODO — Phase 10]` calibrated-golden-frame item and the §3 wire format.
-- The tooling (already in repo): `tests/manual/stream_demo.py`, `tests/manual/calibration_demo.py`,
-  `tests/manual/validation_experiment.py`, `psychopy_eyetracker_eyetribe/eyetribe/validation.py`.
+- `docs/DEVELOPMENT_PLAN.md` — the **Phase 10** section (authoritative) and §6 (CI / coverage conventions).
+- `docs/REPORT.md` — the **Phase 10** entry (the review findings).
+- Files you'll touch: `tests/integration/test_client_against_mock.py`,
+  `psychopy_eyetracker_eyetribe/mock/mock_server.py`, `psychopy_eyetracker_eyetribe/eyetribe/eyetracker.py`,
+  `pyproject.toml`, `.github/workflows/ci.yml`, `README.md`, `docs/implementation_notes.md`.
 
-## Steps (human-run on the Windows machine; record evidence for each)
-- **10a** `& $py tests\manual\stream_demo.py --real` — gaze-contingent dot tracks the eyes. Save a short
-  screen recording / screenshots.
-- **10b** `& $py tests\manual\calibration_demo.py --real` — full 9-point calibration completes; accuracy
-  reported; redo works; `calibration_result.json` saved.
-- **10c** `& $py tests\manual\validation_experiment.py --real --screen-w-cm <w> --screen-h-cm <h>
-  --dist-cm <d>` — record gaze to known targets; the script computes accuracy (mean offset °),
-  precision (RMS), and a stimulus-onset-to-gaze timing figure. Paste the metrics table into
-  `docs/hardware_validation.md`.
-- **10d** Capture a **calibrated** golden frame: `… validation_experiment.py --real --capture-frame`
-  (saves `tests/manual/_captured_frame_calibrated.json`). Compare it against the §3 schema; if anything
-  differs, apply the §2 discrepancy procedure (update `frames.py` + the mock + `REFERENCES.md` + the
-  golden fixture) and confirm the mock-based CI is still green.
+## Do these IN ORDER
+
+1. **Fix the false-confidence reconnect test.**
+   `tests/integration/test_client_against_mock.py::test_stopping_heartbeats_causes_disconnect_and_reconnect`
+   sets `client._stop_evt` manually — which suppresses `_on_server_eof` (the reader only calls it when
+   `_stop_evt` is NOT set), so the reconnect path never runs and the final assertion is trivially true.
+   Rewrite it so the **server** drops the client *without* touching `client._stop_evt`: add a small public
+   helper to `MockEyeTribeServer` (e.g. `drop_clients()`) that closes its connected `_ClientHandler`(s)
+   while the listening socket stays up; call it, then assert (a) the client detects EOF and reconnects
+   (`client.state == STATE_CONNECTED`) against the still-listening mock, and (b) no duplicate threads
+   remain (snapshot `threading.enumerate()` names before/after; the count of `EyeTribe*` threads is
+   stable — this is the Phase 9 reconnect-hygiene guarantee). PsychoPy-free → runs in CI as `integration`.
+
+2. **Broaden the coverage gate to the full PsychoPy-free core.**
+   In `.github/workflows/ci.yml`, change the pytest coverage step to measure every PsychoPy-free core
+   module (one `--cov=` each), keeping `--cov-fail-under=90`:
+   `eyetribe_client`, `frames`, `time_sync`, `calibration`, `validation` (under
+   `psychopy_eyetracker_eyetribe.eyetribe.…`), and `mock_server` (under `…mock.mock_server`).
+   Do **NOT** add `eyetracker.py` or `settings.py` — they are PsychoPy-coupled and their window / Builder
+   code can't run headless, so including them would push coverage down for non-reasons. Run pytest with
+   that coverage; if any listed module is < 90%, add focused unit tests until the whole set is ≥ 90%
+   (likely gaps: `calibration` sequencer methods, `eyetribe_client` error/reconnect branches — step 1
+   already helps the latter). A temporary red CI is acceptable; finish green. Update `DEVELOPMENT_PLAN.md`
+   §6 so its coverage description matches the broadened gate.
+
+3. **`(0,0)` no-gaze validity exclusion.**
+   The Eye Tribe reports `raw/avg = (0,0)` as a "no gaze this frame" sentinel even on `state == 7` frames
+   (confirmed in the smoke capture). Currently `(0,0)` passes the in-bounds check and is marked valid. In
+   `EyeTracker._process_frame` (`eyetracker.py`), make a combined gaze of exactly `(0,0)` invalid:
+   `status = 0 if (frame.is_gaze_valid() and in_bounds and not (combined.x == 0.0 and combined.y == 0.0))
+   else 2`. Do not update `_latest_gaze_position` for invalid samples. Add a test (extend
+   `tests/integration/test_eyetracker_against_mock.py`) using the mock with a fixed `(0,0)` gaze model
+   → assert emitted samples have `status == 2`.
+
+4. **Narrow the coordinate-method exception handling.**
+   In `eyetracker.py`, `_eyeTrackerToDisplayCoords` / `_displayToEyeTrackerCoords` use a bare
+   `except Exception` that silently falls back to raw pixels. Narrow to `except (AttributeError,
+   TypeError)` with a one-time `log.debug(...)` on fallback, so a genuine `_pixel2DisplayCoord` error
+   surfaces instead of silently emitting raw pixels. Keep the no-display passthrough and the existing
+   `tests/unit/test_eyetracker_coords.py` passing (its no-display case sets `_display_device = None` →
+   `AttributeError`, still caught).
+
+5. **Remove the stale `pyproject.toml` comment** above `[tool.mypy]`
+   ("Strict type-checking … ENABLED FROM PHASE 1 … not run in Phase 0 CI") — obsolete.
+
+6. **Documentation.**
+   - Document the `(0,0)` / no-gaze behaviour **prominently in `README.md`** (Limitations): the plugin
+     drops the Eye Tribe's `(0,0)` "no-gaze" sentinel as invalid (`status = 2`), so analysis never sees
+     phantom samples at the screen origin.
+   - Add the same note to `docs/implementation_notes.md`.
 
 ## Acceptance criteria
-- 10a–10c run on the ET1000; results recorded in `docs/hardware_validation.md` (device serial, Eye Tribe
-  Server version, Windows build, date, operator, evidence paths).
-- Accuracy / precision in the ET-class typical range (≈ 0.5–1°; record actuals); timing characterized.
-- Calibrated golden frame captured; any reconciliation merged; full mock-based CI still green.
-- Tag **`v1.0.0`** — CI builds the wheel and attaches it to the GitHub Release.
+- Reconnect test triggers the real EOF→reconnect path and asserts reconnection + stable thread count;
+  green in CI.
+- Coverage gate measures the full PsychoPy-free core (`eyetribe_client`, `frames`, `time_sync`,
+  `calibration`, `validation`, `mock_server`) at ≥ 90%, green on `windows-latest`.
+- `(0,0)` combined gaze → `status = 2` (asserted); README + implementation notes document it.
+- Coordinate methods catch only `(AttributeError, TypeError)` (+ debug log); stale `pyproject` comment gone.
+- `ruff`/`black`/`isort`/`mypy` clean; full CI suite (`-m "not hardware and not iohub"`) green; the
+  host-only `iohub` launchHubServer test is unaffected.
 
 ## Conventions (§6)
-- Any code fixes are PsychoPy-free where possible and keep the suite green. Branch
-  `phase-10-hardware-validation`; Conventional Commits; PR `Phase 10: Hardware validation & release`
-  with the checklist + evidence; append a Phase 10 section to `docs/REPORT.md`; update `CHANGELOG.md`.
-  On success, tag `v1.0.0`.
+- Branch `phase-10-fixes`; Conventional Commits; PR `Phase 10: Post-review fixes & hardening` with the
+  acceptance criteria as a ticked checklist + evidence (test output, coverage %); append a Phase 10
+  section to `docs/REPORT.md`; update `CHANGELOG.md`.
 
-## Notes
-- If `getPosition()` / gaze coordinates look wrong on hardware, that points back at the Phase 9
-  coordinate fix — stop and re-verify Phase 9 rather than papering over it here.
+## Dev/test commands
+```
+pip install -e .[dev]
+ruff check . && black --check . && isort --check-only . && mypy && pytest -m "not hardware and not iohub" -q
+```
 ````

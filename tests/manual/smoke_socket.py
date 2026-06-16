@@ -8,7 +8,7 @@ machine with the Eye Tribe Server running:
 
 It opens a TCP socket to the Server, sets protocol version 1, enables push, prints the
 first frames, and saves one raw frame to ``tests/manual/_captured_frame.json`` (the
-Phase 2 golden-fixture seed). Phase 10 turns this into the recorded validation artifact.
+Phase 2 golden-fixture seed). Phase 11 turns this into the recorded validation artifact.
 """
 
 from __future__ import annotations

@@ -1,5 +1,5 @@
 # Distributed under the terms of the GNU General Public License v3 (GPLv3).
-"""[HARDWARE] Validation experiment (Phase 10c): spatial accuracy, precision, and timing.
+"""[HARDWARE] Validation experiment (Phase 11c): spatial accuracy, precision, and timing.
 
 Presents a 9-point grid of targets, records gaze from the Eye Tribe for each,
 and computes:
@@ -68,7 +68,7 @@ _ON_TARGET_RADIUS_PX = 150.0
 
 
 def _parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Eye Tribe validation experiment (Phase 10c)")
+    p = argparse.ArgumentParser(description="Eye Tribe validation experiment (Phase 11c)")
     p.add_argument("--real", action="store_true", help="Connect to the real Eye Tribe Server.")
     p.add_argument("--screen-w-cm", type=float, default=53.1, metavar="CM")
     p.add_argument("--screen-h-cm", type=float, default=29.9, metavar="CM")

@@ -1,5 +1,5 @@
 # Distributed under the terms of the GNU General Public License v3 (GPLv3).
-"""[HARDWARE] Calibration demo (Phase 10b): full 9-point calibration on the Eye Tribe.
+"""[HARDWARE] Calibration demo (Phase 11b): full 9-point calibration on the Eye Tribe.
 
 Runs the Eye Tribe 9-point calibration using :class:`~psychopy_eyetracker_eyetribe.eyetribe.calibration.CalibrationSequencer`
 driven by a PsychoPy window, then prints and saves the accuracy report.

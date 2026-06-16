@@ -47,7 +47,7 @@ PsychoPy-free domain code.
   `STATE_TRACKING_LOST`, and malformed (→ `FrameParseError`).
 - All 32 representable low-5-bit `state` combinations decode deterministically (table-driven test).
 - Tests in `tests/unit/test_frames.py` using mock-generated fixtures. (A real **calibrated** golden
-  frame is added in Phase 10; the current `_captured_frame.json` is uncalibrated — fine for schema.)
+  frame is added in Phase 11; the current `_captured_frame.json` is uncalibrated — fine for schema.)
 
 ## Conventions (§6)
 - PsychoPy-free; full type hints; pass `mypy --strict` (the module is already in `[tool.mypy]`).

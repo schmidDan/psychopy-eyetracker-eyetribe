@@ -63,7 +63,7 @@ to ≥ 1800 frames) or use `stream_demo.py` and observe no disconnect.
 
 ---
 
-### 4. Plugin stream (10a)
+### 4. Plugin stream (11a)
 **Script:** `tests/manual/stream_demo.py`
 
 Gaze dot tracks the eyes in the PsychoPy window.
@@ -81,7 +81,7 @@ Gaze dot tracks the eyes in the PsychoPy window.
 
 ---
 
-### 5. Calibration (10b)
+### 5. Calibration (11b)
 **Script:** `tests/manual/calibration_demo.py`
 
 Full 9-point `runSetupProcedure` on the device. Pass: completes, accuracy reported, redo works.
@@ -103,7 +103,7 @@ redo path (R key) restarts cleanly; accept saves `calibration_result.json`.
 
 ---
 
-### 6. Accuracy / precision / timing (10c)
+### 6. Accuracy / precision / timing (11c)
 **Script:** `tests/manual/validation_experiment.py`
 
 Present 9 known on-screen targets, record gaze, compute metrics.
@@ -151,8 +151,8 @@ After running step 6 with `--capture-frame`:
 3. Overwrite `tests/manual/_captured_frame.json` with the calibrated frame
    (so the golden fixture reflects real calibrated data).
 
-**Reconciliation status:** _None — Phase 10 not yet run on hardware._
+**Reconciliation status:** _None — Phase 11 not yet run on hardware._
 
 ## Results
 
-_None yet — populated after Phase 10 hardware run._
+_None yet — populated after Phase 11 hardware run._
