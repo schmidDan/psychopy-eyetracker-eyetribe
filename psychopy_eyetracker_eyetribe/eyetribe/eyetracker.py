@@ -2,8 +2,10 @@
 """Eye Tribe ioHub EyeTracker device (Common Eye Tracker Interface).
 
 Phase 3: recording, polling, and BinocularEyeSampleEvent / fixation-event generation.
-Phase 4: coordinate transforms via transforms.py; clock-offset model via time_sync.py.
-Phase 5 will add PsychoPy-driven calibration.
+Phase 4: clock-offset model via time_sync.py.
+Phase 5: PsychoPy-driven calibration.
+Phase 9: coordinate conversion delegates to the ioHub Display device
+         (_pixel2DisplayCoord / display2PIxelCoord), matching the base-class pattern.
 """
 
 from __future__ import annotations
@@ -19,7 +21,6 @@ from psychopy.iohub.devices.eyetracker import EyeTrackerDevice
 from .eyetribe_client import STATE_CONNECTED, EyeTribeClient
 from .frames import Frame, FrameParseError, parse_frame
 from .time_sync import ClockSync
-from .transforms import DisplayBounds, display_to_eyetribe_pixels, eyetribe_pixels_to_display
 
 log = logging.getLogger(__name__)
 
@@ -341,12 +342,13 @@ class EyeTracker(EyeTrackerDevice):
         else:
             iohub_time = logged_time  # should not happen after setRecordingState(True)
 
-        status = 0 if frame.is_gaze_valid() else 2
-
         gaze_source = self._gaze_source
         left_gaze = frame.left.raw if gaze_source == "raw" else frame.left.avg
         right_gaze = frame.right.raw if gaze_source == "raw" else frame.right.avg
         combined = frame.gaze(gaze_source)
+
+        in_bounds = 0 <= combined.x <= self._screen_w and 0 <= combined.y <= self._screen_h
+        status = 0 if (frame.is_gaze_valid() and in_bounds) else 2
 
         lgx, lgy = self._eyeTrackerToDisplayCoords((left_gaze.x, left_gaze.y))
         rgx, rgy = self._eyeTrackerToDisplayCoords((right_gaze.x, right_gaze.y))
@@ -577,44 +579,35 @@ class EyeTracker(EyeTrackerDevice):
     # ── coordinate transforms ─────────────────────────────────────────────────
 
     def _eyeTrackerToDisplayCoords(self, eyetracker_point: Any) -> tuple[float, float]:
-        """Convert Eye Tribe pixel coords to ioHub display coords via transforms.py."""
+        """Convert Eye Tribe pixel coords (top-left origin) to ioHub display coords.
+
+        Delegates to the ioHub Display device's ``_pixel2DisplayCoord`` method,
+        which handles all unit systems (pix, norm, height, deg) and multi-monitor
+        index resolution — matching the base-class default pattern exactly.
+        Falls back to a pixel pass-through when no display device is present
+        (unit-test harness without ioHub).
+        """
         gaze_x, gaze_y = float(eyetracker_point[0]), float(eyetracker_point[1])
         try:
-            bounds = self._get_display_bounds()
-            return eyetribe_pixels_to_display(
-                gaze_x, gaze_y, self._screen_w, self._screen_h, bounds
+            return self._display_device._pixel2DisplayCoord(  # type: ignore[no-any-return]
+                gaze_x, gaze_y, self._display_device.getIndex()
             )
         except Exception:
             return gaze_x, gaze_y
 
     def _displayToEyeTrackerCoords(self, x: float, y: float) -> tuple[float, float]:
-        """Inverse: convert ioHub display coords back to Eye Tribe pixel coords."""
-        try:
-            bounds = self._get_display_bounds()
-            return display_to_eyetribe_pixels(x, y, self._screen_w, self._screen_h, bounds)
-        except Exception:
-            return x, y
+        """Inverse: convert ioHub display coords back to Eye Tribe pixel coords.
 
-    def _get_display_bounds(self) -> DisplayBounds:
-        """Return ``(left, top, right, bottom)`` in display units from the ioHub Display device.
-
-        Falls back to Y-down pixel passthrough bounds ``(0, 0, screen_w, screen_h)``
-        when no display device is available (e.g. unit-test harness) or when the
-        device does not expose ``getBounds()``.
+        Delegates to the ioHub Display device's ``display2PIxelCoord`` method
+        (note the capitalisation: ``PIxel``, matching the installed PsychoPy source).
+        Falls back to a pixel pass-through when no display device is present.
         """
         try:
-            bounds = self._display_device.getBounds()
-            if isinstance(bounds, dict):
-                return (
-                    float(bounds["left"]),
-                    float(bounds["top"]),
-                    float(bounds["right"]),
-                    float(bounds["bottom"]),
-                )
-            return (float(bounds[0]), float(bounds[1]), float(bounds[2]), float(bounds[3]))
-        except (AttributeError, TypeError, KeyError, IndexError):
-            # No display device or unrecognised format — Y-down pixel passthrough
-            return (0.0, 0.0, float(self._screen_w), float(self._screen_h))
+            return self._display_device.display2PIxelCoord(  # type: ignore[no-any-return]
+                x, y, self._display_device.getIndex()
+            )
+        except Exception:
+            return x, y
 
     # ── teardown ──────────────────────────────────────────────────────────────
 

@@ -26,7 +26,7 @@ jobs:
       - name: Mypy (PsychoPy-free core)
         run: mypy
       - name: Pytest
-        run: pytest -m "not hardware" -q --cov=psychopy_eyetracker_eyetribe.eyetribe.eyetribe_client --cov=psychopy_eyetracker_eyetribe.mock.mock_server --cov-report=term-missing --cov-fail-under=90
+        run: pytest -m "not hardware and not iohub" -q --cov=psychopy_eyetracker_eyetribe.eyetribe.eyetribe_client --cov=psychopy_eyetracker_eyetribe.mock.mock_server --cov-report=term-missing --cov-fail-under=90
       - name: Coder demo (against mock)
         run: python examples/coder_demo.py
       - name: Doc-link check

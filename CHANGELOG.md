@@ -5,6 +5,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/); the project 
 
 ## [Unreleased]
 
+### Fixed
+- **Coordinate units (Phase 9):** `EyeTracker._eyeTrackerToDisplayCoords` /
+  `_displayToEyeTrackerCoords` now delegate to the ioHub Display device
+  (`_pixel2DisplayCoord` / `display2PIxelCoord`) instead of the defunct `getBounds()`
+  path.  Gaze positions in real experiments are now reported in the experiment's display
+  unit (`pix`, `norm`, `height`, `deg`) rather than raw top-left pixels.
+- **Validity guard (Phase 9):** `_process_frame` sets `status = 0` only when the Eye
+  Tribe frame is state-valid **and** the combined gaze is within the screen bounds
+  (`0 ≤ x ≤ screen_w`, `0 ≤ y ≤ screen_h`); uncalibrated or out-of-range gaze yields
+  `status = 2`, matching the REFERENCES.md validity rule.
+- **Reconnect hygiene (Phase 9):** `EyeTribeClient._reconnect_bg` now stops and joins
+  the previous reader and heartbeat threads before starting new ones in `_connect_once`,
+  eliminating the potential for duplicate background threads after a server-EOF reconnect.
+
+### Removed
+- **`transforms.py` (Phase 9):** deleted; coordinate conversion is now handled entirely
+  by the ioHub Display device.  `tests/unit/test_transforms.py` removed accordingly.
+
 ### Added
 - **Phase 7 documentation & examples**: expanded `README.md` with prerequisites
   (Eye Tribe Server install source), install instructions, Coder and Builder quick

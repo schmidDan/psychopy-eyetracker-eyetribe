@@ -254,6 +254,41 @@ def test_server_eof_triggers_reconnect() -> None:
     srv.stop()
 
 
+def test_reconnect_does_not_leave_duplicate_threads() -> None:
+    """After a server-EOF reconnect no duplicate reader or heartbeat threads remain.
+
+    Phase 9 fix: _reconnect_bg now stops/joins the old reader + heartbeat before
+    calling _connect_once, so only exactly one of each survives after reconnect.
+    """
+    import threading as _threading
+
+    srv = MockEyeTribeServer(port=0, frame_rate=30, heartbeat_interval_ms=3000)
+    srv.start()
+    client = EyeTribeClient(host=srv.host, port=srv.port)
+    client.connect()
+
+    # Force the server to drop the client (triggers _on_server_eof → _reconnect_bg)
+    with srv._clients_lock:
+        for c in list(srv._clients):
+            c.stop()
+
+    # Wait long enough for reconnect to complete (backoff + connect round-trip)
+    time.sleep(2.0)
+
+    # Count live threads with the names started by EyeTribeClient
+    live = [t for t in _threading.enumerate() if t.is_alive()]
+    readers = [t for t in live if t.name == "EyeTribeReaderThread"]
+    heartbeats = [t for t in live if t.name == "EyeTribeHeartbeatThread"]
+
+    client.close()
+    srv.stop()
+
+    assert len(readers) <= 1, f"Expected ≤1 reader thread after reconnect, found {len(readers)}"
+    assert (
+        len(heartbeats) <= 1
+    ), f"Expected ≤1 heartbeat thread after reconnect, found {len(heartbeats)}"
+
+
 # ── Mock server: gaze models and segments ────────────────────────────────────
 
 

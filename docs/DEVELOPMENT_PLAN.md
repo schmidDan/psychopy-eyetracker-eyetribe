@@ -53,9 +53,10 @@ identically everywhere it is used.
    time-sync → calibration → packaging. Each layer has its own tests and runs independently.
 3. **Mirror the reference plugin** `psychopy/psychopy-eyetracker-pupil-labs` exactly for structure,
    packaging, and discovery so the result is familiar to PsychoPy maintainers.
-4. **Clean core / framework boundary.** `EyeTribeClient`, `frames`, transforms, time-sync, and
-   calibration sequencing contain **zero PsychoPy imports** and are fully unit-testable standalone.
+4. **Clean core / framework boundary.** `EyeTribeClient`, `frames`, time-sync, and calibration
+   sequencing contain **zero PsychoPy imports** and are fully unit-testable standalone.
    ioHub/PsychoPy types appear only in the `EyeTracker` device class and the Builder settings backend.
+   (Phase 9: `transforms.py` was removed; coordinate conversion is handled by the ioHub Display device.)
 5. **Every phase ends in one reviewable, mergeable PR** with green CI and a `REPORT.md` entry. A phase
    is done only when its acceptance criteria are demonstrably met.
 
@@ -184,7 +185,8 @@ one captured real frame and applies the discrepancy procedure (§2) if needed.
 ```
 
 *Diagram labels are shorthand. The parser function is `frames.parse_frame()` (Phase 2); `EyeTribeClient`
-itself is stdlib-only, while `numpy` is used by `transforms.py` and the validation metrics (`validation.py`) — not the client.*
+itself is stdlib-only, while `numpy` is used by the validation metrics (`validation.py`) — not the client.
+`transforms.py` was removed in Phase 9; coordinate conversion is delegated to the ioHub Display device.*
 
 ---
 
@@ -217,7 +219,6 @@ psychopy-eyetracker-eyetribe/
 │   │   ├── eyetracker.py          # EyeTracker(EyeTrackerDevice)
 │   │   ├── eyetribe_client.py     # EyeTribeClient transport (no psychopy imports)
 │   │   ├── frames.py              # Frame/EyeData dataclasses + parser + state bitmask
-│   │   ├── transforms.py          # pixel<->display coordinate math (no psychopy imports)
 │   │   ├── time_sync.py           # tracker<->psychopy clock-offset model (no psychopy imports)
 │   │   ├── calibration.py         # calibration sequencing helpers (no psychopy imports)
 │   │   ├── settings.py            # EyeTribeEyetrackerBackend (Builder dropdown integration)
@@ -231,11 +232,12 @@ psychopy-eyetracker-eyetribe/
     ├── unit/
     │   ├── test_frames.py
     │   ├── test_client.py
-    │   ├── test_transforms.py
+    │   ├── test_eyetracker_coords.py  # Phase 9: stub-display coordinate delegation
     │   └── test_time_sync.py
     ├── integration/
     │   ├── test_client_against_mock.py
-    │   └── test_eyetracker_against_mock.py
+    │   ├── test_eyetracker_against_mock.py
+    │   └── test_launchhub_against_mock.py  # Phase 9: iohub marker, host-only
     └── manual/                    # [HARDWARE] — require ET1000 + Eye Tribe Server
         ├── smoke_socket.py
         ├── stream_demo.py
@@ -465,8 +467,9 @@ config-driven gaze source.
   **1e-6** in normalized space.
 - Synthetic frames with known `time` map to expected PsychoPy times within **1 ms** in unit tests
   (deterministic math; no hardware jitter).
-**Tests.** `tests/unit/test_transforms.py` (parametrized over units × resolutions, incl. inverse
-round-trip) and `tests/unit/test_time_sync.py` (offset estimation, drift re-estimation, RTT correction).
+**Tests.** `tests/unit/test_time_sync.py` (offset estimation, drift re-estimation, RTT correction).
+*(Phase 4 originally included `test_transforms.py`; this was removed in Phase 9 when `transforms.py`
+was replaced by the ioHub Display device delegation.)*
 
 ### Phase 5 — Calibration via PsychoPy (`runSetupProcedure`)
 **Objective.** PsychoPy-drawn calibration driving the Eye Tribe calibration API.

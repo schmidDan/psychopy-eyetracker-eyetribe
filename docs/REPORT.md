@@ -589,3 +589,59 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
   --real`, 10c `validation_experiment --real`; record metrics in `docs/hardware_validation.md`;
   10d capture + reconcile a **calibrated** golden frame (§2 procedure); tag **`v1.0.0`**.
   See `docs/PHASE10_HANDOFF.md` and `docs/HUMAN_TASKS.md` (Phase 10).
+
+## Phase 9 — ioHub integration fixes & hardening  (status: DONE)
+
+- Date: 2026-06-16
+- Agent: Claude Sonnet 4.6
+- Branch: `phase-9-integration-fixes` / PR: pending
+
+### Delivered (Part A — code & tests, no hardware)
+- **Coordinate fix (primary):** Replaced `_eyeTrackerToDisplayCoords` / `_displayToEyeTrackerCoords`
+  in `eyetracker.py` with the base-class pattern (`_display_device._pixel2DisplayCoord` /
+  `display2PIxelCoord`).  Removed `_get_display_bounds`, deleted `transforms.py` and
+  `tests/unit/test_transforms.py`, removed them from `[tool.mypy]` and coverage scope.
+  Gaze in a real experiment now flows through the Display device and arrives in the experiment's
+  unit system (`pix`, `norm`, …), not raw top-left pixels.
+- **CI-runnable coordinate test:** `tests/unit/test_eyetracker_coords.py` — injects a stub
+  `_display_device` (`_pixel2DisplayCoord` / `getIndex`) and asserts delegation + known pixel mapping
+  (screen centre → display origin; corners map correctly).  Fallback (no display device) also tested.
+- **Validity guard:** `_process_frame` now sets `status = 0` only when `frame.is_gaze_valid()` AND
+  combined gaze is in-bounds (`0 ≤ x ≤ screen_w`, `0 ≤ y ≤ screen_h`); otherwise `status = 2`.
+  `_latest_gaze_position` is not updated for invalid samples (already correct).
+- **Reconnect hygiene:** `_reconnect_bg` now sets the stop event, joins the old reader + heartbeat
+  threads, clears the event, and only then calls `_connect_once` — eliminating the potential for
+  duplicate heartbeat threads after a server-EOF reconnect.  Asserted by `test_reconnect_does_not_leave_duplicate_threads` in `test_client_coverage.py`.
+- **Permanent `launchHubServer` regression test:** `tests/integration/test_launchhub_against_mock.py`
+  under `@pytest.mark.iohub`.  Starts `MockEyeTribeServer`, calls `launchHubServer`, records ≥ 1 s,
+  asserts `getEvents()` non-empty and `getPosition()` inside Display bounds.  Excluded from CI
+  (`-m "not hardware and not iohub"`); run locally as Part B.
+- **pyproject.toml:** `iohub` marker registered; `integration` marker description corrected (drives
+  device directly, no subprocess); CI step updated to `-m "not hardware and not iohub"`.
+- **Docs reconciled:** `coordinate_systems.md` §1.6 updated to describe the new delegation pattern;
+  `DEVELOPMENT_PLAN.md` repo tree, Principle 4, and §4 footnote updated; `transforms.py` removed.
+  Entry-point group (`psychopy.iohub.devices.eyetracker.hw`) and `.pth` step already documented
+  in `REFERENCES.md` / `HUMAN_TASKS.md` (no further action needed).
+- **Builder path verified:** `settings.py` `getParams` / `writeDeviceCode` signatures match
+  `MouseGazeEyetrackerBackend` exactly (both `@classmethod` with `cls, inits, buff` and `cls`).
+  No fixes required.
+
+### Acceptance criteria (Part A)
+- PASS: CI-runnable coordinate test guards the delegation fix.
+- PASS: Validity guard (in-bounds check) implemented; existing `test_validity_propagation_*` tests
+  continue to cover status=2 for tracking-lost frames.
+- PASS: Reconnect hygiene implemented; duplicate-thread assertion added.
+- PASS: `iohub` marker registered; CI step excludes it; `integration` marker description corrected.
+- PASS: Docs reconciled.
+- PENDING (Part B): `test_launchhub_against_mock` host-run; `getPosition()` unit check; REPORT.md
+  update with Part B outcomes.
+
+### Part B — human-in-the-loop verification (2026-06-16, Windows host)
+- [x] `pytest -m iohub -q` → `test_launchhub_against_mock_events_and_position` **PASS** (1 passed in 15.30 s).
+  Events non-empty; `getPosition()` returned coordinates with `abs(gx) < 500` (i.e. not raw pixels ~960),
+  confirming the Phase 9 coordinate fix is active in the real ioHub subprocess.
+- [x] No display-unit snippet run separately — the regression test covers the coordinate assertion end-to-end.
+- Phase 9 DONE (Part A + Part B complete).
+
+### Open issues / handed to Phase 10
+- Phase 9 Part B must complete before tagging v1.0.0.  Hardware validation (Phase 10) follows.
