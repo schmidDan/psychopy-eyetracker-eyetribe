@@ -88,6 +88,13 @@ Bounds: `(left=−1, top=1, right=1, bottom=−1)`
 (`screenresw` / `screenresh`) and cached as `EyeTracker._screen_w/_screen_h`
 (defaults 1920 × 1080).
 
+> **Phase 9 fix (pending):** `self._display_device.getBounds()` is **not** an ioHub Display method —
+> it raises, so the fallback above emits gaze in **raw top-left pixels**, not the experiment's display
+> units. Phase 9 replaces the override with the base `self._display_device._pixel2DisplayCoord(gaze_x,
+> gaze_y, self._display_device.getIndex())` (Eye Tribe gaze is already top-left pixels), after which
+> `transforms.py` is no longer used by the device path. Update §1.6 when Phase 9 lands. See
+> `DEVELOPMENT_PLAN.md` Phase 9 and `docs/PHASE9_HANDOFF.md`.
+
 ---
 
 ## 2. Time synchronisation
