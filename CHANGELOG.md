@@ -6,6 +6,32 @@ The format follows [Keep a Changelog](https://keepachangelog.com/); the project 
 ## [Unreleased]
 
 ### Fixed
+- **Reconnect test (Phase 10):** Rewrote
+  `test_stopping_heartbeats_causes_disconnect_and_reconnect` to trigger
+  reconnect via a server-side socket drop (`MockEyeTribeServer.drop_clients()`)
+  instead of manually setting `client._stop_evt`, so the real EOF→reconnect path
+  is actually exercised.  Test now asserts state `CONNECTED` after reconnect and
+  stable `EyeTribe*` thread count (Phase 9 reconnect-hygiene guarantee).
+- **`(0,0)` no-gaze sentinel (Phase 10):** `EyeTracker._process_frame` now
+  treats combined gaze of exactly `(0, 0)` as invalid (`status = 2`), preventing
+  the Eye Tribe's "no gaze this frame" sentinel from appearing as valid gaze data
+  at the screen origin.
+- **Coordinate-method exception narrowing (Phase 10):** `_eyeTrackerToDisplayCoords`
+  and `_displayToEyeTrackerCoords` now catch only `(AttributeError, TypeError)`
+  instead of a bare `except Exception`, so genuine errors in
+  `_pixel2DisplayCoord` / `display2PIxelCoord` surface rather than silently
+  falling back to raw pixels.
+
+### Changed
+- **Coverage gate broadened (Phase 10):** CI now measures the full PsychoPy-free
+  core (`eyetribe_client`, `frames`, `time_sync`, `calibration`, `validation`,
+  `mock_server`) at ≥ 90%; was previously only `eyetribe_client` + `mock_server`.
+
+### Removed
+- **Stale `pyproject.toml` comment (Phase 10):** Removed the obsolete
+  "ENABLED FROM PHASE 1 … not run in Phase 0 CI" comment above `[tool.mypy]`.
+
+### Fixed
 - **Coordinate units (Phase 9):** `EyeTracker._eyeTrackerToDisplayCoords` /
   `_displayToEyeTrackerCoords` now delegate to the ioHub Display device
   (`_pixel2DisplayCoord` / `display2PIxelCoord`) instead of the defunct `getBounds()`

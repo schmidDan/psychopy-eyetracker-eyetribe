@@ -27,6 +27,7 @@ from psychopy.iohub.devices.eyetracker import EyeTrackerDevice  # noqa: E402
 from psychopy_eyetracker_eyetribe.eyetribe.eyetracker import EyeTracker  # noqa: E402
 from psychopy_eyetracker_eyetribe.mock.mock_server import (  # noqa: E402
     MockEyeTribeServer,
+    fixed_point_model,
     make_lost_segment,
 )
 
@@ -370,3 +371,35 @@ def test_tracker_time_returns_float(tracker):
     assert ts > 0, "trackerSec() not positive"
     # trackerSec ≈ trackerTime * 0.001; tolerance 10 ms — each call re-reads the clock
     assert abs(ts - tt * 0.001) < 1e-2
+
+
+# ── (0,0) no-gaze sentinel ────────────────────────────────────────────────────
+
+
+def test_zero_gaze_sentinel_emits_invalid_status():
+    """Mock with (0,0) fixed gaze → all samples have status=2 (no-gaze sentinel)."""
+    _reset_singleton()
+    srv = MockEyeTribeServer(
+        port=0,
+        frame_rate=30,
+        heartbeat_interval_ms=3000,
+        gaze_model=fixed_point_model(x=0.0, y=0.0),
+    )
+    srv.start()
+    try:
+        t = EyeTracker(dconfig=_make_dconfig(srv.port))
+        t.setConnectionState(True)
+        t.setRecordingState(True)
+        time.sleep(0.3)
+        t._poll()
+        samples = _sample_events(_drain_events(t))
+    finally:
+        t._close()
+        _reset_singleton()
+        srv.stop()
+
+    assert samples, "No samples produced"
+    statuses = [s[49] for s in samples]
+    assert all(
+        s == 2 for s in statuses
+    ), f"Expected all status=2 for (0,0) gaze, got statuses: {set(statuses)}"

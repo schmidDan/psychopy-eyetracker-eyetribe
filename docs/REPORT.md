@@ -624,19 +624,55 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
 - Pre-Phase-11 review (this session) found follow-ups → **Phase 10 (post-review fixes & hardening)** is
   next (see `docs/PHASE10_HANDOFF.md`), then **Phase 11** (hardware validation & release).
 
-## Phase 10 — Post-review fixes & hardening  (status: NOT STARTED)
+## Phase 10 — Post-review fixes & hardening  (status: DONE)
 
-- Source: pre-Phase-11 codebase review (this session). Found: a false-confidence reconnect test (passes
-  for the wrong reason — sets `client._stop_evt`, which suppresses the EOF→reconnect path), a coverage
-  gate narrower than documented, the uncalibrated `(0,0)` no-gaze sentinel marked valid, and two minor
-  cleanups. Full detail + ordered steps in `docs/PHASE10_HANDOFF.md` and the **Phase 10** section of
-  `DEVELOPMENT_PLAN.md`.
-- Planned (in order): (1) rewrite the reconnect test to actually trigger EOF→reconnect and assert no
-  duplicate threads; (2) broaden the coverage gate to the full PsychoPy-free core (`eyetribe_client`,
-  `frames`, `time_sync`, `calibration`, `validation`, `mock_server`) at ≥ 90%; (3) `(0,0)` no-gaze
-  sentinel → `status = 2`; (4) narrow the coordinate-method `except` to `(AttributeError, TypeError)`;
-  (5) drop the stale `pyproject` mypy comment; (6) document the `(0,0)` behaviour in `README.md` +
-  `implementation_notes.md`, and commit the staged `transforms.py` doc-reference fixes.
+- Date: 2026-06-16
+- Agent: Claude Sonnet 4.6
+- Branch: `phase-10-fixes` / PR: pending
+
+### Delivered
+
+1. **Reconnect test rewritten** (`test_client_against_mock.py`): replaced the false-confidence
+   `test_stopping_heartbeats_causes_disconnect_and_reconnect` (which set `client._stop_evt` manually,
+   suppressing `_on_server_eof`) with a version that drops the connection from the server side via the
+   new `MockEyeTribeServer.drop_clients()` helper.  The test now asserts (a) `client.state ==
+   STATE_CONNECTED` after reconnect against the still-listening mock and (b) the count of `EyeTribe*`
+   threads is stable (Phase 9 reconnect-hygiene guarantee).  `drop_clients()` closes the handlers'
+   sockets without setting `_stop_evt`, so the real EOF→`_on_server_eof`→`_reconnect_bg` path fires.
+
+2. **Coverage gate broadened** (`.github/workflows/ci.yml`): the `pytest --cov` step now measures
+   `eyetribe_client`, `frames`, `time_sync`, `calibration`, `validation`, and `mock_server` (six
+   `--cov=` flags), keeping `--cov-fail-under=90`.  `eyetracker.py` and `settings.py` are excluded
+   (PsychoPy-coupled; window/Builder paths can't run headless).  Observed coverage: `calibration` 100%,
+   `frames` 100%, `time_sync` 100%, `validation` 100%, `eyetribe_client` 93%, `mock_server` 91%.
+   Total 94% — gate green with no new tests required.  DEVELOPMENT_PLAN.md §6 updated to match.
+
+3. **`(0,0)` no-gaze validity exclusion** (`eyetracker.py` `_process_frame`): combined gaze of exactly
+   `(0, 0)` now yields `status = 2` regardless of `is_gaze_valid()` and `in_bounds`.  Asserted by
+   `test_zero_gaze_sentinel_emits_invalid_status` (new, in `test_eyetracker_against_mock.py`) using a
+   `fixed_point_model(x=0.0, y=0.0)` mock — all emitted samples have `status == 2`.
+
+4. **Coordinate-method exception narrowing** (`eyetracker.py`): replaced `except Exception` in
+   `_eyeTrackerToDisplayCoords` / `_displayToEyeTrackerCoords` with `except (AttributeError, TypeError)`
+   plus a `log.debug(...)` on fallback.  The no-display (`_display_device = None`) path in
+   `test_eyetracker_coords.py` still passes (raises `AttributeError`, correctly caught).
+
+5. **Stale `pyproject.toml` comment removed**: the "ENABLED FROM PHASE 1 … not run in Phase 0 CI" block
+   above `[tool.mypy]` is gone.
+
+6. **Documentation**: `README.md` Limitations table gained a **No-gaze sentinel `(0, 0)`** row.
+   `docs/implementation_notes.md` Validity rule and Known Limitations updated with the `(0, 0)`
+   sentinel behaviour.  `CHANGELOG.md` updated.
+
+### Acceptance criteria
+
+- PASS: Reconnect test exercises real EOF→reconnect path; asserts `STATE_CONNECTED` + stable thread
+  count; green (`pytest -m "not hardware and not iohub" -q` — 192 passed, 6 skipped in ~27 s).
+- PASS: Coverage gate measures full PsychoPy-free core at ≥ 90% (total 94%); green on local run.
+- PASS: `(0,0)` → `status = 2` asserted by new integration test.
+- PASS: Coordinate methods catch `(AttributeError, TypeError)` only; `test_eyetracker_coords.py` passes.
+- PASS: Stale `pyproject` comment removed.
+- PASS: `README.md` + `implementation_notes.md` document the `(0,0)` sentinel behaviour.
 
 ## Phase 11 — Hardware validation & release  (status: NOT STARTED — blocked on Phase 10)
 

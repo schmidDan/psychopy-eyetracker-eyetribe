@@ -8,6 +8,7 @@ import time
 import pytest
 
 from psychopy_eyetracker_eyetribe.eyetribe.eyetribe_client import (
+    STATE_CONNECTED,
     STATE_DISCONNECTED,
     EyeTribeClient,
     FrameBuffer,
@@ -110,34 +111,41 @@ def test_heartbeat_keeps_link_alive_30s() -> None:
 
 
 def test_stopping_heartbeats_causes_disconnect_and_reconnect() -> None:
-    """Killing heartbeats triggers mock disconnect; client detects and reconnects."""
-    # Short heartbeat interval so the mock drops the client quickly.
-    srv = MockEyeTribeServer(port=0, frame_rate=10, heartbeat_interval_ms=300)
+    """Server drops the client; EOF triggers reconnect without duplicate threads."""
+    srv = MockEyeTribeServer(port=0, frame_rate=10, heartbeat_interval_ms=3000)
     srv.start()
     try:
         client = EyeTribeClient(host=srv.host, port=srv.port)
         client.connect()
+        time.sleep(0.2)  # let a few frames arrive to confirm connection
 
-        # Stop the heartbeat thread by setting its stop event manually
-        assert client._heartbeat is not None
-        # Signal heartbeat thread to stop (without calling close, so reader stays up)
-        client._stop_evt.set()  # this also kills reader — that's OK for this test
-        client._heartbeat.join(timeout=2.0)
+        def _et_thread_names() -> list[str]:
+            return [t.name for t in threading.enumerate() if t.name.startswith("EyeTribe")]
 
-        # Wait long enough for the mock's heartbeat enforcer to drop the connection
-        # (interval = 300 ms, enforcer checks every 100 ms)
-        time.sleep(1.5)
+        names_before = _et_thread_names()
+        assert (
+            len(names_before) >= 2
+        ), f"Expected ≥2 EyeTribe threads before drop, got {names_before}"
 
-        # The reconnect background thread tries RECONNECT_ATTEMPTS (3) × RECONNECT_BACKOFF_S (0.5s)
-        # With the mock still running, it should reconnect.
-        time.sleep(2.5)  # give the reconnect background thread time to succeed
+        # Drop the connection from the server side WITHOUT touching client._stop_evt.
+        # The client's reader hits EOF → _on_server_eof fires → _reconnect_bg spawns.
+        srv.drop_clients()
 
-        # state should be CONNECTED again (reconnect succeeded) OR DISCONNECTED (exhausted retries)
-        # Both are valid outcomes to assert — the important thing is the client *attempted* reconnect.
-        # The mock is still running, so reconnect should succeed.
-        assert client.state != "CONNECTING", "Client stuck in CONNECTING state"
+        # _reconnect_bg joins old threads (~0 s) + 1×RECONNECT_BACKOFF_S (0.5 s) + connect.
+        # Give it 5 s headroom to be safe on a loaded CI runner.
+        time.sleep(5.0)
+
+        assert (
+            client.state == STATE_CONNECTED
+        ), f"Expected STATE_CONNECTED after reconnect, got {client.state!r}"
+
+        # Reconnect hygiene: no duplicate threads — count of EyeTribe* threads is stable.
+        names_after = _et_thread_names()
+        assert len(names_after) == len(
+            names_before
+        ), f"Thread count changed after reconnect: before={names_before}, after={names_after}"
     finally:
-        # Clean up without calling close (stop_evt already set)
+        client.close()
         srv.stop()
 
 
