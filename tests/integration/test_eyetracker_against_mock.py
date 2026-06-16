@@ -300,19 +300,21 @@ def test_fixation_start_emitted_on_fix_transition(tracker):
 def test_fixation_end_emitted_on_fix_exit():
     """FixationEndEvent is emitted when fix transitions True→False (via lost segment)."""
     _reset_singleton()
-    # Normal frames for 0.1 s, then lost for 0.3 s (fix goes False)
+    # start_s=0.5 gives headroom for CI setup overhead (accept-loop timeout up to
+    # 0.2 s + handshake) before the first fix=True frame is seen.  Lost segment
+    # runs 0.5→0.9 s; sleep 1.2 s comfortably covers the transition.
     srv = MockEyeTribeServer(
         port=0,
         frame_rate=30,
         heartbeat_interval_ms=3000,
-        segments=[make_lost_segment(start_s=0.15, duration_s=0.4)],
+        segments=[make_lost_segment(start_s=0.5, duration_s=0.4)],
     )
     srv.start()
     try:
         t = EyeTracker(dconfig=_make_dconfig(srv.port))
         t.setConnectionState(True)
         t.setRecordingState(True)
-        time.sleep(0.6)
+        time.sleep(1.2)
         t._poll()
         events = _drain_events(t)
     finally:
