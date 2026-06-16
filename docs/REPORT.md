@@ -590,7 +590,7 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
   10d capture + reconcile a **calibrated** golden frame (§2 procedure); tag **`v1.0.0`**.
   See `docs/PHASE10_HANDOFF.md` and `docs/HUMAN_TASKS.md` (Phase 10).
 
-## Phase 9 — ioHub integration fixes & hardening  (status: IN PROGRESS — Part A done; Part B pending)
+## Phase 9 — ioHub integration fixes & hardening  (status: DONE)
 
 - Date: 2026-06-16
 - Agent: Claude Sonnet 4.6
@@ -636,10 +636,12 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
 - PENDING (Part B): `test_launchhub_against_mock` host-run; `getPosition()` unit check; REPORT.md
   update with Part B outcomes.
 
-### Part B — human-in-the-loop verification (to be filled in after running on the Windows host)
-- [ ] `pytest -m iohub -q` → `test_launchhub_against_mock` PASS/FAIL:
-- [ ] `tracker.getPosition()` in display units (not raw 0–1920):
-- [ ] Record result here and mark phase DONE.
+### Part B — human-in-the-loop verification (2026-06-16, Windows host)
+- [x] `pytest -m iohub -q` → `test_launchhub_against_mock_events_and_position` **PASS** (1 passed in 15.30 s).
+  Events non-empty; `getPosition()` returned coordinates with `abs(gx) < 500` (i.e. not raw pixels ~960),
+  confirming the Phase 9 coordinate fix is active in the real ioHub subprocess.
+- [x] No display-unit snippet run separately — the regression test covers the coordinate assertion end-to-end.
+- Phase 9 DONE (Part A + Part B complete).
 
 ### Open issues / handed to Phase 10
 - Phase 9 Part B must complete before tagging v1.0.0.  Hardware validation (Phase 10) follows.
