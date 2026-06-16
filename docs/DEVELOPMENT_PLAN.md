@@ -46,7 +46,7 @@ identically everywhere it is used.
 
 ## 1. Guiding principles
 
-1. **Hardware-independent development.** Everything except Phase 8 (validation) is built and tested
+1. **Hardware-independent development.** Everything except Phase 10 (hardware validation) is built and tested
    *without* the ET1000, against a **mock Eye Tribe server** (Phase 1 deliverable). Hardware steps are
    isolated, scripted, and marked `[HARDWARE]`.
 2. **Vertical slices behind stable interfaces.** Transport → data model → ioHub device → transforms/
@@ -65,7 +65,7 @@ identically everywhere it is used.
 
 | Topic | Source | Used to verify |
 |---|---|---|
-| Eye Tribe Tracker API (wire format, frames, calibration, heartbeat) | `github.com/EyeTribe/documentation` — API Reference + Developer's Guide | That the concrete schema in §3 matches the documentation, and (Phase 8) a captured real frame |
+| Eye Tribe Tracker API (wire format, frames, calibration, heartbeat) | `github.com/EyeTribe/documentation` — API Reference + Developer's Guide | That the concrete schema in §3 matches the documentation, and (Phase 10) a captured real frame |
 | ioHub Common Eye Tracker Interface & required methods | `psychopy.org/api/iohub/device/eyetracker.html`; MouseGaze/Tobii/GazePoint implementation notes; the installed `psychopy.iohub.devices.eyetracker.EyeTrackerDevice` source | Exact `EyeTracker` method signatures and the device-YAML key structure for the pinned PsychoPy (filenames are pinned in §0/§5) |
 | Packaging & discovery | `github.com/psychopy/psychopy-eyetracker-pupil-labs` (`pyproject.toml`, `__init__.py`, package layout) — already captured in §5 | That entry-point groups/values resolve in PsychoPy 2026.1.3 |
 | Working transport reference | `peyetribe` (Baekgaard) and PyGaze's eyetribe backend | Cross-check the socket/heartbeat behaviour of `EyeTribeClient` |
@@ -156,7 +156,7 @@ calibresult = {
 **Screen geometry:** obtain the pixel resolution the Server is using from `screenresw`/`screenresh`
 (via `tracker get`). The coordinate transform (Phase 4) uses these, not assumptions.
 
-This section is authoritative. Phase 0 verifies it against the documentation; Phase 8 verifies it against
+This section is authoritative. Phase 0 verifies it against the documentation; Phase 10 verifies it against
 one captured real frame and applies the discrepancy procedure (§2) if needed.
 
 ---
@@ -184,7 +184,7 @@ one captured real frame and applies the discrepancy procedure (§2) if needed.
 ```
 
 *Diagram labels are shorthand. The parser function is `frames.parse_frame()` (Phase 2); `EyeTribeClient`
-itself is stdlib-only, while `numpy` is used by `transforms.py` and the Phase 8 metrics — not the client.*
+itself is stdlib-only, while `numpy` is used by `transforms.py` and the validation metrics (`validation.py`) — not the client.*
 
 ---
 
@@ -264,7 +264,7 @@ where = ["", "psychopy_eyetracker_eyetribe"]
 [tool.setuptools.package-data]
 "*" = ["*.yaml"]
 
-[project.entry-points."psychopy.iohub.devices.eyetracker"]
+[project.entry-points."psychopy.iohub.devices.eyetracker.hw"]
 eyetribe = "psychopy_eyetracker_eyetribe.eyetribe"
 
 [project.entry-points."psychopy.experiment.components.settings.eyetracking"]
@@ -273,7 +273,9 @@ EyeTribeEyetrackerBackend = "psychopy_eyetracker_eyetribe.eyetribe.settings:EyeT
 Standard project metadata (`version`, `description`, `readme`, `authors`, `classifiers`, `urls`) is also
 required and is included as usual; it is omitted above only for brevity. The sections shown — build
 system, dependencies, packaging `find`/`package-data`, and the two entry-point groups — must appear
-verbatim, as they drive discovery.
+verbatim, as they drive discovery. **The device group must end in `.hw`** (`psychopy.iohub.devices.eyetracker.hw`):
+PsychoPy builds the full module path `psychopy.iohub.devices.eyetracker.hw.eyetribe` and matches the
+entry-point group by prefix, so the shorter group never matches (verified post-Phase-7).
 
 There are **no** `psychopy.experiment.components` entry points and no Builder component icons: the Eye
 Tribe integrates purely as an eyetracker backend, so no custom Builder components (and therefore no
@@ -300,17 +302,24 @@ evidence (test output, coverage %, screenshots for `[HARDWARE]`). Squash-merge.
 **Commits.** Conventional Commits (`feat:`/`fix:`/`test:`/`docs:`/`chore:`/`refactor:`).
 
 **Versioning.** Semantic Versioning. Pre-hardware development releases are tagged `0.x`; the first
-`1.0.0` tag follows successful Phase 8 validation. `CHANGELOG.md` is updated for every release tag.
+`1.0.0` tag follows successful Phase 10 hardware validation. `CHANGELOG.md` is updated for every release tag.
 
 **CI (`ci.yml`) — `runs-on: windows-latest`, Python 3.10, single configuration (no matrix):**
 1. `ruff check` + `black --check` + `isort --check` — must be clean.
 2. `mypy` on the PsychoPy-free core (`eyetribe_client.py`, `frames.py`, `transforms.py`, `time_sync.py`,
    `calibration.py`) — strict; no errors. The ioHub `EyeTracker` class and `settings.py` are excluded
    (loose framework base types).
-3. `pytest` unit + integration against the **mock** — all green.
+3. `pytest -m "not hardware and not iohub"` — unit + the device-against-mock integration tests, all
+   green. These construct `EyeTracker` **directly** against the mock (no ioHub subprocess, no display),
+   so they run headless on the runner.
 4. Coverage gate: **≥ 90%** on the PsychoPy-free core (`eyetribe_client`, `frames`, transforms,
-   time-sync, calibration sequencing). The ioHub class is covered best-effort via the mock integration
-   test (no numeric gate, since it runs an ioHub subprocess).
+   time-sync, calibration sequencing). The ioHub `EyeTracker` class is covered best-effort via the
+   device-against-mock tests (no numeric gate).
+
+**Not in the CI gate — host-run only.** Tests marked `@pytest.mark.iohub` spawn a real ioHub subprocess
+via `launchHubServer` and need a display (+ the `.pth` dev step); the GitHub runner can't do this
+reliably, so they are **excluded from CI** (`-m "... and not iohub"`) and run locally on the Windows
+host (Phase 9 Part B). `@pytest.mark.hardware` likewise needs the ET1000 (Phase 10).
 
 CI is Windows-only by design: the device, the Eye Tribe Server, and the target PsychoPy build are
 Windows-only, so there is no value in other-OS runners even though the mock-based tests are
@@ -337,7 +346,9 @@ done. The task tracker mirrors this.
 
 ## 7. Phased plan
 
-Linear dependencies. Phases 0–7 are pure software against the mock; Phase 8 is the only hardware phase.
+Linear dependencies. Phases 0–7 are software (mock-tested). **Phase 8** (validation tooling) is complete;
+**Phase 9** fixes the ioHub-integration issues found in review (software + on-machine verification);
+**Phase 10** is the hardware-validation & release phase on the ET1000.
 
 ### Phase 0 — Repository scaffold & fact verification
 **Objective.** Stand up repo, tooling, CI skeleton; verify all externally-fixed facts.
@@ -401,7 +412,7 @@ reconnect, overflow drop); `tests/unit/test_client.py` (message framing, request
   `STATE_TRACKING_LOST`, and malformed (→ `FrameParseError`).
 - All 32 representable low-5-bit `state` combinations decode deterministically (table-driven test).
 **Tests.** `tests/unit/test_frames.py` with fixture frames generated by the mock; one real captured
-frame is added as a golden fixture in Phase 8.
+frame is added as a golden fixture in Phase 10.
 
 ### Phase 3 — ioHub EyeTracker class (recording & polling)
 **Objective.** A working ioHub device streaming samples (calibration/transforms follow).
@@ -506,27 +517,106 @@ Builder dropdown check recorded in `REPORT.md`.
 - All public API has docstrings; the Coder demo runs against the mock in CI.
 **Tests.** Doc-link check + the example script executed against the mock in CI.
 
-### Phase 8 — `[HARDWARE]` validation on the ET1000
-**Objective.** Confirm real-hardware operation; capture real fixtures. **Only hardware phase.** Each
-step is small, self-contained, scripted, and produces a recorded artifact.
-**Steps (each independently runnable):**
-- **8a `smoke_socket.py`** — raw socket to `:6555`, `set version`/`set push`, print N frames + capture
-  one real frame as a committed golden fixture. Proves Server + device stream before any PsychoPy
-  involvement.
-- **8b `stream_demo.py`** — minimal PsychoPy window, gaze-contingent dot fed by the plugin. Output:
-  screen recording / screenshots.
-- **8c `calibration_demo.py`** — full `runSetupProcedure` on hardware. Output: accuracy report +
-  screenshots.
-- **8d Validation experiment** — present known on-screen targets, record gaze, compute spatial accuracy
-  (mean offset, degrees), precision (RMS), and a stimulus-onset-to-gaze timing check. Output: results
-  table in `docs/hardware_validation.md`.
-- Reconcile any real-frame differences into `frames.py` + `REFERENCES.md` + the mock + golden fixtures
-  (per the §2 discrepancy procedure).
+### Phase 8 — Validation tooling & hardware smoke (COMPLETE)
+**Objective.** Provide the scripts + analysis needed for hardware validation — all developed and verified
+against the **mock** — plus the one-off hardware stream smoke (the pre-Phase-0 gate). The on-hardware
+*execution* of this tooling is **Phase 10** (after the Phase 9 fixes).
+**Status.** DONE, mock-verified (see `docs/REPORT.md`).
+**Deliverables (in repo).**
+- `tests/manual/smoke_socket.py` — raw-socket stream check (run on hardware 2026-06-15, PASS;
+  `_captured_frame.json` saved).
+- `tests/manual/stream_demo.py` — gaze-contingent dot via `EyeTribeClient` (mock + `--real`).
+- `tests/manual/calibration_demo.py` — standalone 9-point calibration via `CalibrationSequencer`.
+- `tests/manual/validation_experiment.py` — target-grid accuracy / precision / timing experiment.
+- `psychopy_eyetracker_eyetribe/eyetribe/validation.py` — PsychoPy-free metrics
+  (`compute_accuracy` / `compute_precision` / `compute_timing_stats`) + `tests/unit/test_validation.py`.
+- `docs/hardware_validation.md` — run-environment table, per-step checklist, metrics table, and the
+  calibrated-golden-frame reconciliation procedure.
+**Acceptance criteria (met).** All scripts run against the mock; `validation.py` unit tests green;
+lint/type clean. Hardware execution is deferred to Phase 10.
+
+### Phase 9 — ioHub integration fixes & hardening
+**Objective.** Resolve the issues found in the pre-handoff code review so a real PsychoPy experiment
+(via `launchHubServer`) reports gaze in the correct **display units**, tighten validity and reconnect
+behaviour, and guard the working integration with a permanent automated test. **Mechanical/coding work
+first; human-in-the-loop verification second.**
+**Prerequisite.** Phases 1–8 merged. **Environment:** Part A needs only Python 3.10; Part B needs
+PsychoPy 2026.1.3 (+ a display).
+**Context (already working — do not "re-fix").** A prior one-off `launchHubServer` test recorded 32
+events after the entry-point group was set to `psychopy.iohub.devices.eyetracker.hw` and the event
+classes were exported from `eyetribe/__init__.py` (both already in the code). The event pipeline works;
+the gaps below are narrower.
+
+**Part A — code & tests (no hardware).**
+- **Coordinate units (primary fix).** `EyeTracker._eyeTrackerToDisplayCoords` /
+  `_displayToEyeTrackerCoords` call `self._display_device.getBounds()`, which is **not** an ioHub Display
+  method → it raises → the silent fallback emits gaze in **raw top-left pixels**, not the experiment's
+  display units. Replace with the base pattern
+  `self._display_device._pixel2DisplayCoord(gaze_x, gaze_y, self._display_device.getIndex())` (Eye Tribe
+  gaze is already top-left pixels — exactly that method's expected input), keeping a pixel pass-through
+  only as the no-display test fallback. `transforms.py` then becomes unused by the device path:
+  **delete `transforms.py` and `tests/unit/test_transforms.py`**, remove them from the `[tool.mypy]`
+  files list and the coverage scope, and update the references in §5 (repo tree), Principle 4 (§1), the
+  §4 architecture footnote, and `docs/coordinate_systems.md` §1.6 to match.
+- **Validity guard.** In `_process_frame`, emit `status=0` only when the sample is state-valid **and**
+  in-bounds (`0 ≤ x ≤ screen_w`, `0 ≤ y ≤ screen_h`); otherwise `status=2`. Matches `REFERENCES.md`
+  ("calibrated + in-bounds, not the `STATE_TRACKING_GAZE` bit alone").
+- **Reconnect hygiene.** `EyeTribeClient._reconnect_bg` / `_connect_once` can leave a second heartbeat
+  thread running and re-clear the shared `_stop_evt`. A reconnect must stop/join the previous reader +
+  heartbeat before starting new ones; assert no duplicate threads after a reconnect.
+- **Permanent `launchHubServer` regression test — host-run, NOT in the CI gate.** Promote the throwaway
+  `_test_launchhub.py` to `tests/integration/test_launchhub_against_mock.py` under a dedicated marker
+  `@pytest.mark.iohub`: start the mock, run `launchHubServer` with `eyetracker.hw.eyetribe.EyeTracker`,
+  record ≥ 1 s, and assert `io.devices.tracker.getEvents()` is non-empty **and** `getPosition()` is
+  inside the active Display's bounds (this is what catches the coordinate bug). It spawns a real ioHub
+  subprocess + display, so **exclude it from GitHub CI** (register the `iohub` marker in `pyproject.toml`;
+  CI runs `-m "not hardware and not iohub"`); run it **locally on the Windows host** (with the `.pth`
+  step) as the first step of Part B. Do **not** mark it `integration` — those tests drive the device
+  directly and must keep running headless in CI.
+- **Doc/code reconciliation.** Set the entry-point group to `psychopy.iohub.devices.eyetracker.hw` in
+  §5.1 and `REFERENCES.md` (code + `test_discovery.py` already use it). Document the ioHub-subprocess
+  `.pth` developer step (so the editable install is visible to the server subprocess) in `HUMAN_TASKS.md`.
+- **Verify the Builder path.** Confirm `settings.py` `getParams` / `writeDeviceCode` match the in-tree
+  `MouseGazeEyetrackerBackend` (no automated test covers Builder code-gen).
+
+**Part B — human-in-the-loop verification (Windows + PsychoPy).**
+- Run `pytest -m iohub -q` on the machine; confirm `test_launchhub_against_mock` is green.
+- Run a minimal real experiment (or the README snippet) and confirm `tracker.getPosition()` returns
+  coordinates in the **window's units** (e.g. centred for `pix`), not raw `0–1920` pixels.
+- Record outcomes in `docs/REPORT.md` (Phase 9 section).
+
 **Acceptance criteria.**
-- 8a–8c run on the Windows test machine against the ET1000.
-- 8d reports accuracy/precision (record actuals; ET-class typical ≈ 0.5–1°) and a characterized timing
-  offset, written to `docs/hardware_validation.md`.
-- After any reconciliation, the full mock-based CI suite still passes.
+- Coordinate conversion goes through the Display device (no `getBounds`). A **CI-runnable** test injects
+  a stub `_display_device` (`_pixel2DisplayCoord` / `getIndex`) and asserts the delegation + that a known
+  device pixel maps inside the Display bounds — so the fix is regression-guarded in CI without the ioHub
+  subprocess (the host-only `iohub` test is the end-to-end check).
+- Out-of-bounds / uncalibrated gaze yields `status=2` (CI-runnable, via the mock with an out-of-bounds
+  gaze model).
+- No duplicate client threads after a reconnect (asserted).
+- `tests/integration/test_launchhub_against_mock.py` (marker `iohub`) passes **on the Windows host**
+  (`getEvents()` non-empty; `getPosition()` within Display bounds) — recorded in `REPORT.md`; not CI-gated.
+- Docs reconciled (entry-point group; `.pth` step); `ruff`/`black`/`isort`/`mypy` clean; the **CI suite**
+  (`-m "not hardware and not iohub"`) is green on `windows-latest`.
+- Human-in-the-loop verification recorded in `REPORT.md`.
+**Tests.** New `launchHubServer` integration test; reconnect-hygiene test; coordinate-mapping assertion;
+existing suite stays green.
+
+### Phase 10 — `[HARDWARE]` validation & release on the ET1000
+**Objective.** Run the Phase 8 validation tooling on the real ET1000 (after the Phase 9 fixes), record
+accuracy / precision / timing, capture a calibrated golden frame, reconcile, and tag the release.
+**Prerequisite.** Phase 9 merged. **Environment:** Windows + Eye Tribe Server + ET1000.
+**Steps (human-run; each produces a recorded artifact in `docs/hardware_validation.md`).**
+- **10a** `stream_demo.py --real` — gaze dot tracks the eyes (screen recording / screenshots).
+- **10b** `calibration_demo.py --real` — 9-point calibration completes; accuracy reported; redo works;
+  `calibration_result.json` saved.
+- **10c** `validation_experiment.py --real` — record gaze to known targets; compute accuracy
+  (mean offset °), precision (RMS), and a stimulus-onset-to-gaze timing figure; write the metrics table.
+- **10d** Capture a **calibrated** golden frame (`--capture-frame`); reconcile any real-frame differences
+  into `frames.py` + the mock + `REFERENCES.md` (§2 procedure); confirm the mock-based CI still passes.
+**Acceptance criteria.**
+- 10a–10c run on the ET1000; metrics recorded (ET-class typical ≈ 0.5–1°); timing characterized.
+- Calibrated golden frame captured and reconciled; CI suite still green.
+- Tag **`v1.0.0`** (CI builds + attaches the wheel to the GitHub Release).
 **Tests.** Manual; evidence in `REPORT.md` + `docs/hardware_validation.md`.
 
 ---
@@ -543,7 +633,7 @@ failures localize.
 3. **Heartbeat endurance** — stream 60 s with heartbeats. *Pass:* no disconnect.
 4. **Plugin stream** — `stream_demo.py` gaze dot tracks the eyes. *Pass:* dot follows gaze.
 5. **Calibration** — `calibration_demo.py` 9-point. *Pass:* completes, accuracy reported, redo works.
-6. **Accuracy / precision / timing** — `8d`. *Pass:* metrics recorded.
+6. **Accuracy / precision / timing** — `10c`. *Pass:* metrics recorded.
 
 Each item records device serial, Eye Tribe Server version, Windows build, date, agent/operator, result,
 and evidence path.
@@ -556,7 +646,7 @@ and evidence path.
 |---|---|---|---|
 | Eye Tribe Server won't install/run on the current Windows build | Med | High | Run the 8a smoke logic **first, before Phase 0** (it needs only a socket). If it fails, the project is blocked at the source — surface immediately; no further work until streaming is confirmed. |
 | `EyeTrackerDevice` API differs from §3/MouseGaze assumptions in PsychoPy 2026.1.3 | Low | Med | Phase 0 reads the actual installed source into `REFERENCES.md`; integration tests run a real ioHub process. |
-| Real frame schema differs from §3 | Low | Med | §3 is documentation-backed; 8a captures a real frame and applies the §2 discrepancy procedure. |
+| Real frame schema differs from §3 | Low | Med | §3 is documentation-backed; the smoke-socket capture + Phase 10 reconcile a real frame via the §2 discrepancy procedure. |
 | 30 Hz too low for the intended paradigm | Known | Med (scientific) | Documented limitation; not a code defect. raw/avg both exposed. |
 | Pupil size misread as mm | Low | Low | Explicitly documented arbitrary units; no conversion. |
 | Threading races (reader/heartbeat/poll) | Med | Med | Thread-safe bounded buffer, teardown leak assertions, a streaming stress test in CI. |
@@ -566,18 +656,20 @@ and evidence path.
 
 ## 10. Sequencing
 
-- **Pre-Phase 0 gate:** run the 8a smoke logic to confirm the Server + ET1000 actually stream. Cheapest
-  possible de-risk of the whole effort.
-- Phases 0→1→2→3→4→5→6→7→8 are linear. Phase 2 may overlap Phase 1 once the mock emits frames. Docs
-  (Phase 7) may be drafted alongside Phases 3–6. Phase 8 reuses scripts written earlier.
+- **Pre-Phase 0 gate:** run the smoke-socket logic to confirm the Server + ET1000 actually stream
+  (done 2026-06-15). Cheapest possible de-risk of the whole effort.
+- Phases 0→1→2→3→4→5→6→7→8 are linear and complete. **Phase 9** (integration fixes) precedes
+  **Phase 10** (hardware validation & release): full chain 0→…→8 → 9 → 10. Phase 10 runs the Phase 8
+  tooling on the ET1000.
 
 ---
 
 ## 11. Definition of Done (project)
 
-A tagged GPL-3.0 **GitHub Release** with an attached wheel (no PyPI) such that: a researcher with an
-ET1000 and the Eye Tribe Server on Windows installs the wheel into Standalone PsychoPy 2026.1.3, selects
-**Eye Tribe** in the Builder Eyetracker component, runs PsychoPy-driven 9-point calibration, and records
-binocular **raw** gaze samples in display units on the PsychoPy timebase with documented accuracy/
-precision — with the full mock-based test suite green in Windows CI and the hardware validation recorded
-in `docs/hardware_validation.md`.
+A tagged GPL-3.0 **GitHub Release** (`v1.0.0`, end of Phase 10) with an attached wheel (no PyPI) such
+that: a researcher with an ET1000 and the Eye Tribe Server on Windows installs the wheel into Standalone
+PsychoPy 2026.1.3, selects **Eye Tribe** in the Builder Eyetracker component, runs PsychoPy-driven
+9-point calibration, and records binocular **raw** gaze samples **in the experiment's display units**
+(via the Phase 9 coordinate fix) on the PsychoPy timebase with documented accuracy/precision — with the
+full mock-based test suite (including the `launchHubServer` regression test) green in Windows CI and the
+hardware validation recorded in `docs/hardware_validation.md`.

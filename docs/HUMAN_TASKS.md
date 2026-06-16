@@ -159,28 +159,98 @@ The generic per-PR checklist is in the last section.
 
 ---
 
-## Phase 8 — Hardware validation on the ET1000 (the heavy human phase)
+## Phase 8 — Validation tooling & smoke (COMPLETE)
 
-This is the phase that genuinely needs you, the tracker, and a person to look at. Run each step on the
-Windows machine with the Eye Tribe Server running; record evidence in `docs/hardware_validation.md`
-(device serial, Server version, Windows build, date, result, evidence path) for every run.
+The validation scripts and the metrics helper are written and mock-verified; the raw-stream smoke ran on
+hardware. Nothing to do here — hardware *execution* is **Phase 10** (after the **Phase 9** fixes).
 
-- [ ] **8a — raw stream** (already partly done as the setup gate): `& $py tests\manual\smoke_socket.py`.
-      Commit the resulting `_captured_frame.json` as the golden fixture; hand it to the agent to feed
-      `tests/unit/test_frames.py` and to reconcile against `§3` of the plan.
-- [ ] **8b — plugin stream:** `& $py tests\manual\stream_demo.py`. Sit in front of the tracker; confirm
-      the gaze dot follows your eyes. Capture a short screen recording / screenshots.
-- [ ] **8c — calibration on hardware:** `& $py tests\manual\calibration_demo.py`. Run a full 9-point
-      calibration; confirm it completes, the accuracy is reported, and **redo** works. Save the
-      accuracy report + screenshots.
-- [ ] **8d — validation experiment:** present known on-screen targets, record gaze, and compute
-      spatial accuracy (mean offset, °), precision (RMS), and a stimulus-onset-to-gaze timing figure.
-      Write the numbers into `docs/hardware_validation.md`.
-- [ ] **Reconcile:** if any real-frame detail differs from the plan's `§3`, hand the findings to the
-      agent to update `frames.py` + the mock + `REFERENCES.md` + golden fixtures, and confirm the
-      mock-based CI still passes (plan §2 discrepancy procedure).
-- [ ] Once 8a–8d pass and are recorded: tag the **`1.0.0`** release (CI builds + attaches the wheel to
-      the GitHub Release).
+### 8a — Raw stream (already done, 2026-06-15)
+- [x] `& $py "$repo\tests\manual\smoke_socket.py"` — confirmed 30 Hz stream, `_captured_frame.json`
+      saved. Wire-format corrections applied; recorded in `REFERENCES.md`.
+
+---
+
+## Phase 9 — Verify the integration fixes (human-in-the-loop)
+
+The Phase 9 agent fixes the ioHub-integration issues (gaze coordinate units, validity guard, reconnect
+hygiene) and adds a permanent `launchHubServer` regression test. Your part is the on-machine
+verification once that PR is up.
+
+- [ ] **One-time dev step for the ioHub subprocess** — the ioHub server runs from PsychoPy's *own*
+      packages dir, so an editable install isn't visible to it. Create a `.pth` pointing at the repo:
+      ```powershell
+      $pth = "$env:APPDATA\psychopy3\packages\Python310\site-packages\psychopy_eyetracker_eyetribe_dev.pth"
+      Set-Content -Path $pth -Value $repo
+      ```
+      (End users installing the wheel do **not** need this.)
+- [ ] **Run the host-only ioHub test** on the machine (it spawns the ioHub subprocess, so it's excluded
+      from CI):
+      ```powershell
+      & $py -m pytest -m iohub -q
+      ```
+      Confirm `test_launchhub_against_mock` passes (`getEvents()` non-empty; `getPosition()` in bounds).
+- [ ] **Confirm display-unit gaze** — run the README `launchHubServer` snippet (or a minimal
+      experiment) and check `tracker.getPosition()` returns coordinates in the window's units (e.g.
+      centred for `pix`), not raw `0–1920` pixels.
+- [ ] Record both outcomes in the `docs/REPORT.md` Phase 9 section; review & merge the Phase 9 PR.
+
+---
+
+## Phase 10 — Hardware validation & release on the ET1000 (the heavy human phase)
+
+After Phase 9 is merged, run the Phase 8 tooling on the real device. All scripts are pre-written — **you
+run commands, you do not write code.** Record evidence in `docs/hardware_validation.md` after each step.
+
+### 10a — Plugin stream (gaze dot)
+- [ ] With the Eye Tribe Server running and the ET1000 calibrated, run:
+      ```powershell
+      & $py "$repo\tests\manual\stream_demo.py" --real
+      ```
+      Sit in front of the tracker. Confirm the white dot moves in the direction you look.
+      Press ESCAPE to quit.
+- [ ] Record result + take a screenshot or short screen recording.
+- [ ] Fill in checklist item 4 in `docs/hardware_validation.md`.
+
+### 10b — Calibration demo
+- [ ] Run the 9-point calibration:
+      ```powershell
+      & $py "$repo\tests\manual\calibration_demo.py" --real --output calibration_result.json
+      ```
+      Follow on-screen instructions (SPACE to start, look at each dot, SPACE to accept).
+      Try the redo path (R key) at least once to confirm it works.
+- [ ] Note the overall accuracy (°) printed to the console and shown on the summary screen.
+- [ ] Take a screenshot of the accuracy summary screen.
+- [ ] Fill in checklist item 5 in `docs/hardware_validation.md`.
+
+### 10c — Validation experiment (accuracy / precision / timing)
+- [ ] Immediately after a successful calibration, run (adjust cm values for your actual monitor):
+      ```powershell
+      & $py "$repo\tests\manual\validation_experiment.py" --real `
+          --screen-w-cm 53.1 --screen-h-cm 29.9 --dist-cm 60 `
+          --capture-frame --output validation_results.json
+      ```
+      Follow on-screen instructions (SPACE to start, look at each yellow dot).
+- [ ] The script prints a formatted table — paste it into the metrics table in checklist item 6 of
+      `docs/hardware_validation.md` (it also saves `validation_results.json`).
+- [ ] `--capture-frame` saves `tests/manual/_captured_frame_calibrated.json` automatically.
+
+### 10d — Golden-frame reconciliation (no coding needed from you)
+- [ ] Open `tests/manual/_captured_frame_calibrated.json` and compare the field names and structure
+      with `tests/manual/_captured_frame.json` and `docs/DEVELOPMENT_PLAN.md §3`.
+- [ ] **If the format matches** (field names identical, types correct): just commit the calibrated file
+      and note "no discrepancy" in `docs/hardware_validation.md`.
+- [ ] **If there is a discrepancy** (different field names, unexpected structure): open a new chat with
+      the agent, paste the captured frame, and ask it to apply the §2 discrepancy procedure. The agent
+      will update `frames.py`, the mock, `test_frames.py`, and `REFERENCES.md`, and run CI to confirm
+      it stays green. You merge that fix PR before tagging.
+
+### Tagging v1.0.0
+- [ ] Once 10a–10d are recorded and CI is green:
+      ```powershell
+      git tag v1.0.0
+      git push origin v1.0.0
+      ```
+      CI's `release.yml` builds the wheel and attaches it to a GitHub Release automatically.
 
 ---
 
@@ -191,7 +261,7 @@ Windows machine with the Eye Tribe Server running; record evidence in `docs/hard
 - [ ] Confirm `docs/REPORT.md` has the phase section filled (status, evidence, deviations, hand-offs).
 - [ ] Confirm any `[TO CONFIRM ON MACHINE]` items touched by the phase are now `[CONFIRMED]` in
       `docs/REFERENCES.md`.
-- [ ] **Squash-merge.** Tag a `0.x` release if you want a checkpoint build; `1.0.0` after Phase 8.
+- [ ] **Squash-merge.** Tag a `0.x` release if you want a checkpoint build; `1.0.0` after Phase 10.
 
 ---
 

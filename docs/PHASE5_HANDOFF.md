@@ -46,7 +46,7 @@ proper transforms and time-sync.
 - Tests: `tests/unit` for `calibration.py` (message-sequence + result parsing vs the mock responder, no
   window); `tests/integration` driving `runSetupProcedure` with a headless/offscreen window where
   supported, asserting the exact message sequence sent to the mock.
-- (Visual correctness on real hardware is confirmed by a human in Phase 8c — out of scope here.)
+- (Visual correctness on real hardware is confirmed by a human in Phase 10b — out of scope here.)
 
 ## Conventions (§6)
 - `calibration.py` is PsychoPy-free (mypy --strict + ≥90% coverage; extend the coverage gate to include

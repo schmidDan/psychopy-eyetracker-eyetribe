@@ -12,7 +12,9 @@ The discrepancy procedure (DEVELOPMENT_PLAN.md section 2) applies if any check f
 ## Packaging & discovery
 - **[CONFIRMED]** Reference plugin `psychopy/psychopy-eyetracker-pupil-labs`: setuptools, flat layout,
   `[tool.setuptools.packages.find] where = ["", "<pkg>"]`, `package-data "*" = ["*.yaml"]`.
-- **[CONFIRMED]** Device entry-point group: `psychopy.iohub.devices.eyetracker` (name -> module).
+- **[CONFIRMED — corrected post-Phase-7]** Device entry-point group:
+  `psychopy.iohub.devices.eyetracker.hw` (name -> module). The `.hw` suffix is required; verified working
+  by the `launchHubServer` 32-event run, and `test_discovery.py` asserts this group.
 - **[CONFIRMED]** Builder settings entry-point group: `psychopy.experiment.components.settings.eyetracking`.
 - **[CONFIRMED — 2026-06-15]** Both entry points are registered after `pip install -e .[dev]`, and the
   `EyeTracker` class imports under PsychoPy (`test_eyetracker_class_loads_under_psychopy` passes).
@@ -21,9 +23,9 @@ The discrepancy procedure (DEVELOPMENT_PLAN.md section 2) applies if any check f
   module for the device: after activation, both
   `import psychopy.iohub.devices.eyetracker.hw.eyetribe` and `...eyetracker.eyetribe` raise
   `ModuleNotFoundError`. **Mechanism (pinned):** ioHub resolves the device class from the
-  `psychopy.iohub.devices.eyetracker` entry point **at `launchHubServer` time**, keyed by the config
-  string `eyetracker.hw.eyetribe.EyeTracker`; there is no static importable `hw.<vendor>` module. This
-  matches the reference Pupil Labs plugin (identical entry-point group). The earlier
+  `psychopy.iohub.devices.eyetracker.hw` entry point **at `launchHubServer` time**, keyed by the config
+  string `eyetracker.hw.eyetribe.EyeTracker`; there is no static importable `hw.<vendor>` module.
+  Verified by a `launchHubServer` end-to-end run (32 events recorded). The earlier
   "bare import resolves" expectation was wrong and has been removed from the plan + HUMAN_TASKS.
   End-to-end device load is exercised in Phase 1/3 against the mock via
   `launchHubServer(**{'eyetracker.hw.eyetribe.EyeTracker': {...}})`.
@@ -86,5 +88,5 @@ The discrepancy procedure (DEVELOPMENT_PLAN.md section 2) applies if any check f
   (GAZE|EYES|PRESENCE) does **not** guarantee a usable gaze point. Validity logic (Phase 2/3) must
   require **calibrated + gaze within screen bounds**, not the `STATE_TRACKING_GAZE` bit alone; gaze is
   only meaningful after a successful calibration.
-- **[TODO — Phase 8]** Capture a **calibrated** golden frame (the current `_captured_frame.json` is
+- **[TODO — Phase 10]** Capture a **calibrated** golden frame (the current `_captured_frame.json` is
   uncalibrated) for realistic parser/transform fixtures.

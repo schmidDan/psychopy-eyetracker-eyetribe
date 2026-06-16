@@ -489,5 +489,103 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
   After all three fixes, `launchHubServer` end-to-end test
   (`_test_launchhub.py`) passes: connects mock, records 32 events, exits 0.
 - Verified facts: no new external facts to record.
-- Open issues handed to Phase 8: hardware validation; calibrated golden frame capture;
-  ppd/velocity fields remain UNDEFINED.
+- Open issues handed forward: hardware validation + calibrated golden frame capture (now Phase 10);
+  ppd/velocity fields remain UNDEFINED (acceptable; revisit only if needed).
+
+## Phase 8 — Validation tooling & hardware smoke  (status: DONE — mock-verified; hardware execution re-scoped to Phase 10)
+
+> **Re-scope note (post-review):** the original "Phase 8" was split. The **tooling** (scripts + metrics
+> helper + smoke) is this completed Phase 8; the on-hardware **execution** (formerly 8b/8c/8d) is now
+> **Phase 10** (10a/10b/10c/10d), and **Phase 9** (ioHub integration fixes) precedes it. See the
+> Phase 9 / Phase 10 sections below and `DEVELOPMENT_PLAN.md`.
+
+- Date: 2026-06-15 / Agent: Claude Sonnet 4.6 / Branch: `phase-8-hardware-validation` / PR: pending
+- Delivered (agent — mock-verified):
+  - `psychopy_eyetracker_eyetribe/eyetribe/validation.py` — PsychoPy-free analysis helper
+    (no window, no PsychoPy imports):
+    - `euclidean_degrees(dx_px, dy_px, sw, sh, mw, mh, dist)` — Euclidean offset in visual degrees.
+    - `compute_accuracy(targets, gazes, …)` — mean offset in degrees across target–gaze pairs;
+      `float('nan')` on empty; `ValueError` on length mismatch.
+    - `compute_precision(gaze_samples, …)` — RMS inter-sample distance in degrees (per-fixation jitter).
+    - `compute_timing_stats(latencies_s)` — dict with `median_ms`, `mean_ms`, `min_ms`, `max_ms`.
+  - `tests/unit/test_validation.py` — 26 unit tests (PsychoPy-free):
+    - `euclidean_degrees`: zero, horizontal, vertical, diagonal, symmetry, monotonicity, ~1° spot-check.
+    - `compute_accuracy`: perfect (0°), mean, empty→nan, length mismatch, single point, ~1° realistic.
+    - `compute_precision`: empty→nan, 1 sample→0, identical→0, two samples, uniform jitter, < 0.5° realistic.
+    - `compute_timing_stats`: empty→nan, single, odd count, even count, unordered input, typical range.
+  - `tests/manual/stream_demo.py` (8b) — minimal PsychoPy window with a gaze-contingent white dot:
+    - Uses `EyeTribeClient` directly (no ioHub subprocess); reads `screenresw/h` from the server.
+    - `--real` flag for hardware; default starts a `MockEyeTribeServer` with a linear-sweep gaze model.
+    - Converts Eye Tribe top-left pixel coords to PsychoPy centre/Y-up for `dot.setPos`.
+    - Drains `frame_buffer.get_all()` on every display flip; keeps most recent `STATE_TRACKING_GAZE` frame.
+    - Press ESCAPE to exit cleanly.
+  - `tests/manual/calibration_demo.py` (8c) — standalone 9-point calibration with result saving:
+    - Uses `EyeTribeClient` + `CalibrationSequencer` + `point_layout(9)` directly (no ioHub subprocess).
+    - Identical timing and target-rendering to `runSetupProcedure` (`SETTLE_S=0.75`, `SAMPLE_S=1.0`).
+    - Intro screen (SPACE/ESCAPE), settle loop, sample loop, accuracy summary, accept/redo/abort.
+    - Saves raw `calibresult` JSON to `--output` path on accept.
+    - `--real` flag for hardware; default starts mock.
+  - `tests/manual/validation_experiment.py` (8d) — 9-target validation experiment:
+    - Records gaze for each target (`--target-s`, default 1.0 s) with `--iti-s` blank inter-trial.
+    - Collects valid gaze samples (`STATE_TRACKING_GAZE`) from the `frame_buffer` on every flip.
+    - Computes per-target mean gaze and first-on-target latency (onset flip time → first sample
+      within `_ON_TARGET_RADIUS_PX = 150 px`).
+    - Calls `compute_accuracy`, `compute_precision`, `compute_timing_stats` from `validation.py`.
+    - Prints console report + formatted table ready to paste into `docs/hardware_validation.md`.
+    - Saves full results to `--output` JSON.
+    - `--capture-frame` flag: saves first valid calibrated frame to
+      `tests/manual/_captured_frame_calibrated.json` for golden-fixture reconciliation.
+    - `--screen-w-cm`, `--screen-h-cm`, `--dist-cm` for monitor/viewing-distance configuration.
+    - `--real` flag for hardware; default starts mock with a fixed-point gaze model.
+  - `docs/hardware_validation.md` — expanded with:
+    - Run-environment table (device serial, Server version, Windows build, date, operator).
+    - Per-checklist-item scripts, commands, pass criteria, result+evidence fields.
+    - Metrics table for 8d results (accuracy, precision, timing).
+    - Calibrated golden frame reconciliation procedure.
+- Acceptance criteria — mock-verified parts PASS; the hardware runs below are **deferred to Phase 10**
+  (relabelled there as 10a/10b/10c; `8a` already done as the pre-Phase-0 smoke):
+  - DONE — 8a smoke_socket.py: PASS (confirmed 2026-06-15, pre-Phase-0 gate).
+  - → Phase 10 (10a) — stream_demo.py on ET1000: gaze dot follows eyes.
+  - → Phase 10 (10b) — calibration_demo.py on ET1000: 9-point calibration completes, accuracy
+    reported, redo works; `calibration_result.json` saved.
+  - → Phase 10 (10c) — validation_experiment.py on ET1000: metrics recorded in
+    `docs/hardware_validation.md`; accuracy/precision in ET-class typical range (≈ 0.5–1°).
+  - PENDING (human) — Calibrated golden frame captured (`--capture-frame`) and compared with
+    plan §3 schema; discrepancy procedure applied if needed; CI suite still green.
+  - PASS (mock) — `test_validation.py`: 26 tests green; `ruff`/`black`/`isort`/`mypy` clean.
+- Deviations from plan:
+  - `stream_demo.py` and `calibration_demo.py` use `EyeTribeClient` directly rather than
+    `launchHubServer` / `EyeTracker.runSetupProcedure`.  This avoids the ioHub subprocess
+    complexity in standalone scripts while testing the same transport and calibration-protocol
+    layers.  The full `runSetupProcedure` path is exercised by the Phase 5 integration tests.
+- Verified facts:
+  - `validation.py` is PsychoPy-free; imports only `math`, `typing`, and the standard library.
+  - `stream_demo.py` verified to run against the mock: dot position updates; clean ESCAPE exit.
+- Open issues / handoff:
+  - **Phase 9 (next):** ioHub integration fixes from the pre-handoff review (see `docs/PHASE9_HANDOFF.md`).
+  - **Phase 10 (after Phase 9):** run 10a–10d on the real ET1000; fill `docs/hardware_validation.md`;
+    capture + reconcile the calibrated golden frame; tag `v1.0.0` (see `docs/PHASE10_HANDOFF.md`).
+
+## Phase 9 — ioHub integration fixes & hardening  (status: NOT STARTED)
+
+- Source: pre-handoff code review (this session). The real `launchHubServer` path was confirmed working
+  (a one-off run recorded 32 events after the entry-point group + event-class export fixes), so the
+  earlier "no events / reporting-bypass" worries were retracted. The review surfaced narrower issues —
+  full detail in `docs/PHASE9_HANDOFF.md` and the **Phase 9** section of `DEVELOPMENT_PLAN.md`.
+- Planned (Part A — code/tests): (1) **coordinate units** — `EyeTracker._eyeTrackerToDisplayCoords`
+  calls `self._display_device.getBounds()`, which is not an ioHub Display method → silent fallback emits
+  raw top-left pixels; replace with the base `_pixel2DisplayCoord` so gaze is in display units.
+  (2) in-bounds validity guard (status=2 when gaze out of `[0,screen]`). (3) reconnect thread hygiene in
+  `EyeTribeClient`. (4) permanent `tests/integration/test_launchhub_against_mock.py` (marker `iohub`,
+  **host-run / excluded from CI**) asserting `getEvents()` non-empty and `getPosition()` within Display
+  bounds, plus a CI-runnable stub-Display coordinate test. (5) doc reconciliation
+  (entry-point group `.hw`; `.pth` dev step). (6) verify Builder `settings.py` code-gen vs MouseGaze.
+- Planned (Part B — human-in-the-loop): run the integration test + a real experiment on the machine;
+  confirm `getPosition()` is in window units; record here.
+
+## Phase 10 — Hardware validation & release  (status: NOT STARTED — blocked on Phase 9)
+
+- Run the Phase 8 validation tooling on the ET1000: 10a `stream_demo --real`, 10b `calibration_demo
+  --real`, 10c `validation_experiment --real`; record metrics in `docs/hardware_validation.md`;
+  10d capture + reconcile a **calibrated** golden frame (§2 procedure); tag **`v1.0.0`**.
+  See `docs/PHASE10_HANDOFF.md` and `docs/HUMAN_TASKS.md` (Phase 10).
