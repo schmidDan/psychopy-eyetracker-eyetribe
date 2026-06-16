@@ -3,7 +3,7 @@
 
 PsychoPy-free; importable without a window.  The functions here are the
 numerical core used by ``tests/manual/validation_experiment.py`` to compute
-the Phase 10c metrics and write them to ``docs/hardware_validation.md``.
+the Phase 11c metrics and write them to ``docs/hardware_validation.md``.
 
 Coordinate convention: all gaze and target positions are in **screen pixels**
 with the origin at the top-left corner (the Eye Tribe native format).

@@ -88,5 +88,5 @@ The discrepancy procedure (DEVELOPMENT_PLAN.md section 2) applies if any check f
   (GAZE|EYES|PRESENCE) does **not** guarantee a usable gaze point. Validity logic (Phase 2/3) must
   require **calibrated + gaze within screen bounds**, not the `STATE_TRACKING_GAZE` bit alone; gaze is
   only meaningful after a successful calibration.
-- **[TODO — Phase 10]** Capture a **calibrated** golden frame (the current `_captured_frame.json` is
+- **[TODO — Phase 11]** Capture a **calibrated** golden frame (the current `_captured_frame.json` is
   uncalibrated) for realistic parser/transform fixtures.

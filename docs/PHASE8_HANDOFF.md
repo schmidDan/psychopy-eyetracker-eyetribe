@@ -12,6 +12,6 @@ There is no remaining agent task for Phase 8. The work that previously lived in 
 - **Phase 9 — ioHub integration fixes & hardening** → `docs/PHASE9_HANDOFF.md`
   (coordinate-units fix, validity guard, reconnect hygiene, permanent `launchHubServer` regression test,
   doc reconciliation; code-first then human-in-the-loop verification).
-- **Phase 10 — Hardware validation & release** → `docs/PHASE10_HANDOFF.md`
+- **Phase 11 — Hardware validation & release** → `docs/PHASE11_HANDOFF.md`
   (run this Phase 8 tooling on the real ET1000 *after* the Phase 9 fixes, record metrics, capture a
   calibrated golden frame, reconcile, tag `v1.0.0`).

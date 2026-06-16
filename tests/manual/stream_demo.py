@@ -1,5 +1,5 @@
 # Distributed under the terms of the GNU General Public License v3 (GPLv3).
-"""[HARDWARE] Stream demo (Phase 10a): gaze-contingent dot via the Eye Tribe plugin.
+"""[HARDWARE] Stream demo (Phase 11a): gaze-contingent dot via the Eye Tribe plugin.
 
 A minimal PsychoPy window displays a white circle that follows the gaze
 position in real time, fed by :class:`~psychopy_eyetracker_eyetribe.eyetribe.eyetribe_client.EyeTribeClient`.

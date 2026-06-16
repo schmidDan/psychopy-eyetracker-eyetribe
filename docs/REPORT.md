@@ -489,15 +489,15 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
   After all three fixes, `launchHubServer` end-to-end test
   (`_test_launchhub.py`) passes: connects mock, records 32 events, exits 0.
 - Verified facts: no new external facts to record.
-- Open issues handed forward: hardware validation + calibrated golden frame capture (now Phase 10);
+- Open issues handed forward: hardware validation + calibrated golden frame capture (now Phase 11);
   ppd/velocity fields remain UNDEFINED (acceptable; revisit only if needed).
 
-## Phase 8 — Validation tooling & hardware smoke  (status: DONE — mock-verified; hardware execution re-scoped to Phase 10)
+## Phase 8 — Validation tooling & hardware smoke  (status: DONE — mock-verified; hardware execution re-scoped to Phase 11)
 
 > **Re-scope note (post-review):** the original "Phase 8" was split. The **tooling** (scripts + metrics
 > helper + smoke) is this completed Phase 8; the on-hardware **execution** (formerly 8b/8c/8d) is now
-> **Phase 10** (10a/10b/10c/10d), and **Phase 9** (ioHub integration fixes) precedes it. See the
-> Phase 9 / Phase 10 sections below and `DEVELOPMENT_PLAN.md`.
+> **Phase 11** (11a/11b/11c/11d), and **Phase 9** (ioHub integration fixes) precedes it. See the
+> Phase 9 / Phase 11 sections below and `DEVELOPMENT_PLAN.md`.
 
 - Date: 2026-06-15 / Agent: Claude Sonnet 4.6 / Branch: `phase-8-hardware-validation` / PR: pending
 - Delivered (agent — mock-verified):
@@ -542,13 +542,13 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
     - Per-checklist-item scripts, commands, pass criteria, result+evidence fields.
     - Metrics table for 8d results (accuracy, precision, timing).
     - Calibrated golden frame reconciliation procedure.
-- Acceptance criteria — mock-verified parts PASS; the hardware runs below are **deferred to Phase 10**
-  (relabelled there as 10a/10b/10c; `8a` already done as the pre-Phase-0 smoke):
+- Acceptance criteria — mock-verified parts PASS; the hardware runs below are **deferred to Phase 11**
+  (relabelled there as 11a/11b/11c; `8a` already done as the pre-Phase-0 smoke):
   - DONE — 8a smoke_socket.py: PASS (confirmed 2026-06-15, pre-Phase-0 gate).
-  - → Phase 10 (10a) — stream_demo.py on ET1000: gaze dot follows eyes.
-  - → Phase 10 (10b) — calibration_demo.py on ET1000: 9-point calibration completes, accuracy
+  - → Phase 11 (11a) — stream_demo.py on ET1000: gaze dot follows eyes.
+  - → Phase 11 (11b) — calibration_demo.py on ET1000: 9-point calibration completes, accuracy
     reported, redo works; `calibration_result.json` saved.
-  - → Phase 10 (10c) — validation_experiment.py on ET1000: metrics recorded in
+  - → Phase 11 (11c) — validation_experiment.py on ET1000: metrics recorded in
     `docs/hardware_validation.md`; accuracy/precision in ET-class typical range (≈ 0.5–1°).
   - PENDING (human) — Calibrated golden frame captured (`--capture-frame`) and compared with
     plan §3 schema; discrepancy procedure applied if needed; CI suite still green.
@@ -562,33 +562,10 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
   - `validation.py` is PsychoPy-free; imports only `math`, `typing`, and the standard library.
   - `stream_demo.py` verified to run against the mock: dot position updates; clean ESCAPE exit.
 - Open issues / handoff:
-  - **Phase 9 (next):** ioHub integration fixes from the pre-handoff review (see `docs/PHASE9_HANDOFF.md`).
-  - **Phase 10 (after Phase 9):** run 10a–10d on the real ET1000; fill `docs/hardware_validation.md`;
-    capture + reconcile the calibrated golden frame; tag `v1.0.0` (see `docs/PHASE10_HANDOFF.md`).
-
-## Phase 9 — ioHub integration fixes & hardening  (status: NOT STARTED)
-
-- Source: pre-handoff code review (this session). The real `launchHubServer` path was confirmed working
-  (a one-off run recorded 32 events after the entry-point group + event-class export fixes), so the
-  earlier "no events / reporting-bypass" worries were retracted. The review surfaced narrower issues —
-  full detail in `docs/PHASE9_HANDOFF.md` and the **Phase 9** section of `DEVELOPMENT_PLAN.md`.
-- Planned (Part A — code/tests): (1) **coordinate units** — `EyeTracker._eyeTrackerToDisplayCoords`
-  calls `self._display_device.getBounds()`, which is not an ioHub Display method → silent fallback emits
-  raw top-left pixels; replace with the base `_pixel2DisplayCoord` so gaze is in display units.
-  (2) in-bounds validity guard (status=2 when gaze out of `[0,screen]`). (3) reconnect thread hygiene in
-  `EyeTribeClient`. (4) permanent `tests/integration/test_launchhub_against_mock.py` (marker `iohub`,
-  **host-run / excluded from CI**) asserting `getEvents()` non-empty and `getPosition()` within Display
-  bounds, plus a CI-runnable stub-Display coordinate test. (5) doc reconciliation
-  (entry-point group `.hw`; `.pth` dev step). (6) verify Builder `settings.py` code-gen vs MouseGaze.
-- Planned (Part B — human-in-the-loop): run the integration test + a real experiment on the machine;
-  confirm `getPosition()` is in window units; record here.
-
-## Phase 10 — Hardware validation & release  (status: NOT STARTED — blocked on Phase 9)
-
-- Run the Phase 8 validation tooling on the ET1000: 10a `stream_demo --real`, 10b `calibration_demo
-  --real`, 10c `validation_experiment --real`; record metrics in `docs/hardware_validation.md`;
-  10d capture + reconcile a **calibrated** golden frame (§2 procedure); tag **`v1.0.0`**.
-  See `docs/PHASE10_HANDOFF.md` and `docs/HUMAN_TASKS.md` (Phase 10).
+  - **Phase 9:** ioHub integration fixes (done — see the Phase 9 section below).
+  - **Phase 10:** post-review fixes & hardening (next — see `docs/PHASE10_HANDOFF.md`).
+  - **Phase 11 (after Phase 10):** run 11a–11d on the real ET1000; fill `docs/hardware_validation.md`;
+    capture + reconcile the calibrated golden frame; tag `v1.0.0` (see `docs/PHASE11_HANDOFF.md`).
 
 ## Phase 9 — ioHub integration fixes & hardening  (status: DONE)
 
@@ -643,5 +620,27 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
 - [x] No display-unit snippet run separately — the regression test covers the coordinate assertion end-to-end.
 - Phase 9 DONE (Part A + Part B complete).
 
-### Open issues / handed to Phase 10
-- Phase 9 Part B must complete before tagging v1.0.0.  Hardware validation (Phase 10) follows.
+### Open issues / handed forward
+- Pre-Phase-11 review (this session) found follow-ups → **Phase 10 (post-review fixes & hardening)** is
+  next (see `docs/PHASE10_HANDOFF.md`), then **Phase 11** (hardware validation & release).
+
+## Phase 10 — Post-review fixes & hardening  (status: NOT STARTED)
+
+- Source: pre-Phase-11 codebase review (this session). Found: a false-confidence reconnect test (passes
+  for the wrong reason — sets `client._stop_evt`, which suppresses the EOF→reconnect path), a coverage
+  gate narrower than documented, the uncalibrated `(0,0)` no-gaze sentinel marked valid, and two minor
+  cleanups. Full detail + ordered steps in `docs/PHASE10_HANDOFF.md` and the **Phase 10** section of
+  `DEVELOPMENT_PLAN.md`.
+- Planned (in order): (1) rewrite the reconnect test to actually trigger EOF→reconnect and assert no
+  duplicate threads; (2) broaden the coverage gate to the full PsychoPy-free core (`eyetribe_client`,
+  `frames`, `time_sync`, `calibration`, `validation`, `mock_server`) at ≥ 90%; (3) `(0,0)` no-gaze
+  sentinel → `status = 2`; (4) narrow the coordinate-method `except` to `(AttributeError, TypeError)`;
+  (5) drop the stale `pyproject` mypy comment; (6) document the `(0,0)` behaviour in `README.md` +
+  `implementation_notes.md`, and commit the staged `transforms.py` doc-reference fixes.
+
+## Phase 11 — Hardware validation & release  (status: NOT STARTED — blocked on Phase 10)
+
+- Run the Phase 8 validation tooling on the ET1000: 11a `stream_demo --real`, 11b `calibration_demo
+  --real`, 11c `validation_experiment --real`; record metrics in `docs/hardware_validation.md`;
+  11d capture + reconcile a **calibrated** golden frame (§2 procedure); tag **`v1.0.0`**.
+  See `docs/PHASE11_HANDOFF.md` and `docs/HUMAN_TASKS.md` (Phase 11).

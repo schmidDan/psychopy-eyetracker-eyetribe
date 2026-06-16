@@ -162,7 +162,7 @@ The generic per-PR checklist is in the last section.
 ## Phase 8 — Validation tooling & smoke (COMPLETE)
 
 The validation scripts and the metrics helper are written and mock-verified; the raw-stream smoke ran on
-hardware. Nothing to do here — hardware *execution* is **Phase 10** (after the **Phase 9** fixes).
+hardware. Nothing to do here — hardware *execution* is **Phase 11** (after the **Phase 9** fixes).
 
 ### 8a — Raw stream (already done, 2026-06-15)
 - [x] `& $py "$repo\tests\manual\smoke_socket.py"` — confirmed 30 Hz stream, `_captured_frame.json`
@@ -196,12 +196,27 @@ verification once that PR is up.
 
 ---
 
-## Phase 10 — Hardware validation & release on the ET1000 (the heavy human phase)
+## Phase 10 — Review the post-review fixes (mostly hands-off)
 
-After Phase 9 is merged, run the Phase 8 tooling on the real device. All scripts are pre-written — **you
+Phase 10 is an agent-driven software/CI phase (reconnect-test fix, broadened coverage gate, the `(0,0)`
+no-gaze validity fix, two minor cleanups, and the README/notes documentation). No hardware, no GUI.
+Your part:
+
+- [ ] Review & merge the Phase 10 PR once CI is green. In the diff, sanity-check that: the reconnect test
+      drops the connection **server-side** (not via `client._stop_evt`) and asserts a stable thread count;
+      the coverage gate lists the full PsychoPy-free core at ≥ 90%; `_process_frame` marks a `(0,0)`
+      combined gaze as `status = 2`; and `README.md` documents the `(0,0)` no-gaze behaviour.
+- [ ] CI may go briefly red while the broadened coverage gate is being satisfied — that's expected; it
+      must be green before you merge.
+
+---
+
+## Phase 11 — Hardware validation & release on the ET1000 (the heavy human phase)
+
+After Phase 10 is merged, run the Phase 8 tooling on the real device. All scripts are pre-written — **you
 run commands, you do not write code.** Record evidence in `docs/hardware_validation.md` after each step.
 
-### 10a — Plugin stream (gaze dot)
+### 11a — Plugin stream (gaze dot)
 - [ ] With the Eye Tribe Server running and the ET1000 calibrated, run:
       ```powershell
       & $py "$repo\tests\manual\stream_demo.py" --real
@@ -211,7 +226,7 @@ run commands, you do not write code.** Record evidence in `docs/hardware_validat
 - [ ] Record result + take a screenshot or short screen recording.
 - [ ] Fill in checklist item 4 in `docs/hardware_validation.md`.
 
-### 10b — Calibration demo
+### 11b — Calibration demo
 - [ ] Run the 9-point calibration:
       ```powershell
       & $py "$repo\tests\manual\calibration_demo.py" --real --output calibration_result.json
@@ -222,7 +237,7 @@ run commands, you do not write code.** Record evidence in `docs/hardware_validat
 - [ ] Take a screenshot of the accuracy summary screen.
 - [ ] Fill in checklist item 5 in `docs/hardware_validation.md`.
 
-### 10c — Validation experiment (accuracy / precision / timing)
+### 11c — Validation experiment (accuracy / precision / timing)
 - [ ] Immediately after a successful calibration, run (adjust cm values for your actual monitor):
       ```powershell
       & $py "$repo\tests\manual\validation_experiment.py" --real `
@@ -234,7 +249,7 @@ run commands, you do not write code.** Record evidence in `docs/hardware_validat
       `docs/hardware_validation.md` (it also saves `validation_results.json`).
 - [ ] `--capture-frame` saves `tests/manual/_captured_frame_calibrated.json` automatically.
 
-### 10d — Golden-frame reconciliation (no coding needed from you)
+### 11d — Golden-frame reconciliation (no coding needed from you)
 - [ ] Open `tests/manual/_captured_frame_calibrated.json` and compare the field names and structure
       with `tests/manual/_captured_frame.json` and `docs/DEVELOPMENT_PLAN.md §3`.
 - [ ] **If the format matches** (field names identical, types correct): just commit the calibrated file
@@ -245,7 +260,7 @@ run commands, you do not write code.** Record evidence in `docs/hardware_validat
       it stays green. You merge that fix PR before tagging.
 
 ### Tagging v1.0.0
-- [ ] Once 10a–10d are recorded and CI is green:
+- [ ] Once 11a–11d are recorded and CI is green:
       ```powershell
       git tag v1.0.0
       git push origin v1.0.0
@@ -261,7 +276,7 @@ run commands, you do not write code.** Record evidence in `docs/hardware_validat
 - [ ] Confirm `docs/REPORT.md` has the phase section filled (status, evidence, deviations, hand-offs).
 - [ ] Confirm any `[TO CONFIRM ON MACHINE]` items touched by the phase are now `[CONFIRMED]` in
       `docs/REFERENCES.md`.
-- [ ] **Squash-merge.** Tag a `0.x` release if you want a checkpoint build; `1.0.0` after Phase 10.
+- [ ] **Squash-merge.** Tag a `0.x` release if you want a checkpoint build; `1.0.0` after Phase 11.
 
 ---
 
