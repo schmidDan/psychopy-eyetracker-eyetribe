@@ -348,7 +348,8 @@ class EyeTracker(EyeTrackerDevice):
         combined = frame.gaze(gaze_source)
 
         in_bounds = 0 <= combined.x <= self._screen_w and 0 <= combined.y <= self._screen_h
-        status = 0 if (frame.is_gaze_valid() and in_bounds) else 2
+        is_zero_sentinel = combined.x == 0.0 and combined.y == 0.0
+        status = 0 if (frame.is_gaze_valid() and in_bounds and not is_zero_sentinel) else 2
 
         lgx, lgy = self._eyeTrackerToDisplayCoords((left_gaze.x, left_gaze.y))
         rgx, rgy = self._eyeTrackerToDisplayCoords((right_gaze.x, right_gaze.y))
@@ -592,7 +593,8 @@ class EyeTracker(EyeTrackerDevice):
             return self._display_device._pixel2DisplayCoord(  # type: ignore[no-any-return]
                 gaze_x, gaze_y, self._display_device.getIndex()
             )
-        except Exception:
+        except (AttributeError, TypeError):
+            log.debug("_eyeTrackerToDisplayCoords: no display device, passing through pixels")
             return gaze_x, gaze_y
 
     def _displayToEyeTrackerCoords(self, x: float, y: float) -> tuple[float, float]:
@@ -606,7 +608,8 @@ class EyeTracker(EyeTrackerDevice):
             return self._display_device.display2PIxelCoord(  # type: ignore[no-any-return]
                 x, y, self._display_device.getIndex()
             )
-        except Exception:
+        except (AttributeError, TypeError):
+            log.debug("_displayToEyeTrackerCoords: no display device, passing through pixels")
             return x, y
 
     # ── teardown ──────────────────────────────────────────────────────────────

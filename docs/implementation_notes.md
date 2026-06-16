@@ -92,9 +92,12 @@ Fields not listed above (z, angle, ppd, velocity, `measure2`) are
 
 **Validity rule:** `status == 0` when `STATE_TRACKING_GAZE` is set **and** neither
 `STATE_TRACKING_FAIL` nor `STATE_TRACKING_LOST` is set in the frame's `state`
-bitmask (see §3 of DEVELOPMENT_PLAN.md).  Note that an uncalibrated tracker
-can set `STATE_TRACKING_GAZE` but reports `(0, 0)` or out-of-range coordinates —
-always calibrate before interpreting gaze.
+bitmask **and** the combined gaze is not exactly `(0, 0)` (see §3 of
+DEVELOPMENT_PLAN.md).  The Eye Tribe reports `raw/avg = (0, 0)` as a "no gaze
+this frame" sentinel even on `state == 7` frames; the plugin treats this as
+invalid (`status = 2`) so phantom origin samples never appear in valid gaze data.
+Note that an uncalibrated tracker can also set `STATE_TRACKING_GAZE` but report
+`(0, 0)` — always calibrate before interpreting gaze.
 
 ### FixationStartEvent (29 fields)
 
@@ -200,3 +203,8 @@ and is used by the test suite and the coder demo.  It:
   per-degree and velocity are `UNDEFINED`; the Eye Tribe API does not provide
   them.
 - **No `measure2`** — only `pupil_measure1` (psize) is populated.
+- **No-gaze sentinel `(0, 0)`** — The Eye Tribe reports `raw/avg = (0, 0)` as a
+  "no gaze this frame" sentinel even on `state == 7` frames (confirmed in the
+  smoke capture).  The plugin treats combined gaze of exactly `(0, 0)` as
+  invalid (`status = 2`) and does not update `_latest_gaze_position`, so phantom
+  origin samples never appear in valid gaze data.

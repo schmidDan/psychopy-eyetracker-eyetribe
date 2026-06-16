@@ -56,9 +56,6 @@ line_length = 100
 line-length = 100
 target-version = "py310"
 
-# Strict type-checking is scoped to the PsychoPy-free core and is ENABLED FROM PHASE 1,
-# once real code lands (see docs/DEVELOPMENT_PLAN.md section 6). The stubs are typed but
-# the gate is not run in Phase 0 CI.
 [tool.mypy]
 python_version = "3.10"
 strict = true

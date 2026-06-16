@@ -163,6 +163,7 @@ A ready-to-open Builder experiment is provided in
 | **Gaze signal** | Default is **raw** (per-sample, unfiltered). Switch to `gaze_source: "avg"` for the server-side smoothed signal. |
 | **Platform** | **Windows 10/11 x64 only.** The Eye Tribe Server does not run on macOS or Linux. |
 | **Calibration required** | Uncalibrated gaze coordinates are meaningless (`0,0` or wildly out of range). Always run `runSetupProcedure()` before recording. |
+| **No-gaze sentinel `(0, 0)`** | The Eye Tribe reports `raw/avg = (0, 0)` as a "no gaze this frame" sentinel even when `state == 7` (tracking active). The plugin treats combined gaze of exactly `(0, 0)` as invalid (`status = 2`) and does not update the last-known gaze position, so phantom origin samples never appear in valid gaze data. |
 | **No ppd / velocity** | Pixels-per-degree and velocity fields in `BinocularEyeSampleEvent` are `UNDEFINED`; the Eye Tribe API does not provide them. |
 
 ---

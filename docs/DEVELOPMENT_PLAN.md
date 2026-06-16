@@ -314,10 +314,11 @@ evidence (test output, coverage %, screenshots for `[HARDWARE]`). Squash-merge.
 3. `pytest -m "not hardware and not iohub"` — unit + the device-against-mock integration tests, all
    green. These construct `EyeTracker` **directly** against the mock (no ioHub subprocess, no display),
    so they run headless on the runner.
-4. Coverage gate: **≥ 90%** on `eyetribe_client` + `mock_server` (the modules `ci.yml` measures with
-   `--cov-fail-under=90`). `frames`, `time_sync`, and `calibration` are covered by their own unit tests
-   but are not in the fail-under gate; the ioHub `EyeTracker` class is covered best-effort via the
-   device-against-mock tests (no numeric gate).
+4. Coverage gate: **≥ 90%** on the full PsychoPy-free core — `eyetribe_client`, `frames`, `time_sync`,
+   `calibration`, `validation`, and `mock_server` (each measured with a separate `--cov=` flag,
+   `--cov-fail-under=90`).  `eyetracker.py` and `settings.py` are excluded from the gate because their
+   window / Builder paths cannot run headless.  The ioHub `EyeTracker` class is covered best-effort via
+   the device-against-mock tests (no numeric gate).
 
 **Not in the CI gate — host-run only.** Tests marked `@pytest.mark.iohub` spawn a real ioHub subprocess
 via `launchHubServer` and need a display (+ the `.pth` dev step); the GitHub runner can't do this

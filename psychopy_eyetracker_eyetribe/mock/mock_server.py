@@ -468,6 +468,27 @@ class MockEyeTribeServer:
         with self._calib_log_lock:
             self._calib_log.clear()
 
+    def drop_clients(self) -> None:
+        """Close all connected client sockets to simulate a server-side EOF.
+
+        The listening socket stays up so clients can reconnect.  Each connected
+        client's reader thread hits EOF and calls its ``_on_server_eof`` callback
+        (because the client's own ``_stop_evt`` is not touched).  The push thread
+        on the handler side detects the ``OSError`` on the next send and sets the
+        handler's internal stop event, cleaning up the handler gracefully.
+        """
+        with self._clients_lock:
+            handlers = list(self._clients)
+        for handler in handlers:
+            try:
+                handler._conn.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            try:
+                handler._conn.close()
+            except OSError:
+                pass
+
     # ── internal ──────────────────────────────────────────────────────────────
 
     def _accept_loop(self) -> None:
