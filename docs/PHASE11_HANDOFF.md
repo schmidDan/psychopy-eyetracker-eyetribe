@@ -3,20 +3,20 @@
 Copy the fenced block below to brief the Phase 11 operator/agent.
 
 **Prerequisite:** Phase 10 merged (post-review fixes & hardening; Phase 9 before it).
-**Environment:** Windows + Eye Tribe Server + ET1000. This is the hardware-validation & release phase;
-the validation **tooling already exists** (Phase 8) — Phase 11 *runs* it on real hardware. Mostly human
-labour (see `docs/HUMAN_TASKS.md`, Phase 11); an agent's role is limited to small fixes if a script
-misbehaves and to writing up results.
+**Environment:** Windows + Eye Tribe Server + ET1000. This is the hardware-validation phase (the
+`v1.0.0` release is cut later, in Phase 12); the validation **tooling already exists** (Phase 8) —
+Phase 11 *runs* it on real hardware. Mostly human labour (see `docs/HUMAN_TASKS.md`, Phase 11); an
+agent's role is limited to small fixes if a script misbehaves and to writing up results.
 
 ---
 
 ````
-You are carrying out **Phase 11 — Hardware validation & release on the ET1000** of
-`psychopy-eyetracker-eyetribe`. Phases 0–9 are merged. The validation scripts and the PsychoPy-free
+You are carrying out **Phase 11 — Hardware validation on the ET1000** of
+`psychopy-eyetracker-eyetribe`. Phases 0–10 are merged. The validation scripts and the PsychoPy-free
 metrics helper already exist and are mock-verified (Phase 8); your job is to run them on the real
-device (after the Phase 9 + Phase 10 fixes), record the results, capture a calibrated golden frame,
-reconcile any
-real-frame differences, and tag the release.
+device (after the Phase 9 + Phase 10 fixes), record the results, capture a calibrated golden frame, and
+reconcile any real-frame differences. (The `v1.0.0` release tag is **not** part of this phase — it is
+cut in Phase 12 after the backlog cleanup.)
 
 ## Read first
 - `docs/DEVELOPMENT_PLAN.md` — the **Phase 11** section and §2 (discrepancy procedure).
@@ -44,13 +44,13 @@ real-frame differences, and tag the release.
   Server version, Windows build, date, operator, evidence paths).
 - Accuracy / precision in the ET-class typical range (≈ 0.5–1°; record actuals); timing characterized.
 - Calibrated golden frame captured; any reconciliation merged; full mock-based CI still green.
-- Tag **`v1.0.0`** — CI builds the wheel and attaches it to the GitHub Release.
+- (No release tag here — `v1.0.0` is cut in Phase 12.)
 
 ## Conventions (§6)
 - Any code fixes are PsychoPy-free where possible and keep the suite green. Branch
-  `phase-11-hardware-validation`; Conventional Commits; PR `Phase 11: Hardware validation & release`
-  with the checklist + evidence; append a Phase 11 section to `docs/REPORT.md`; update `CHANGELOG.md`.
-  On success, tag `v1.0.0`.
+  `phase-11-hardware-validation`; Conventional Commits; PR `Phase 11: Hardware validation`
+  with the checklist + evidence; append a Phase 11 section to `docs/REPORT.md`. The `v1.0.0`
+  tag / GitHub Release is handled in Phase 12, not here.
 
 ## Notes
 - If `getPosition()` / gaze coordinates look wrong on hardware, that points back at the Phase 9

@@ -565,7 +565,8 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
   - **Phase 9:** ioHub integration fixes (done — see the Phase 9 section below).
   - **Phase 10:** post-review fixes & hardening (next — see `docs/PHASE10_HANDOFF.md`).
   - **Phase 11 (after Phase 10):** run 11a–11d on the real ET1000; fill `docs/hardware_validation.md`;
-    capture + reconcile the calibrated golden frame; tag `v1.0.0` (see `docs/PHASE11_HANDOFF.md`).
+    capture + reconcile the calibrated golden frame (see `docs/PHASE11_HANDOFF.md`).
+  - **Phase 12 (after Phase 11):** clear `docs/BACKLOG.md` and tag `v1.0.0` (see `docs/PHASE12_HANDOFF.md`).
 
 ## Phase 9 — ioHub integration fixes & hardening  (status: DONE)
 
@@ -622,7 +623,8 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
 
 ### Open issues / handed forward
 - Pre-Phase-11 review (this session) found follow-ups → **Phase 10 (post-review fixes & hardening)** is
-  next (see `docs/PHASE10_HANDOFF.md`), then **Phase 11** (hardware validation & release).
+  next (see `docs/PHASE10_HANDOFF.md`), then **Phase 11** (hardware validation) and **Phase 12**
+  (backlog cleanup & release).
 
 ## Phase 10 — Post-review fixes & hardening  (status: DONE)
 
@@ -674,9 +676,16 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
 - PASS: Stale `pyproject` comment removed.
 - PASS: `README.md` + `implementation_notes.md` document the `(0,0)` sentinel behaviour.
 
-## Phase 11 — Hardware validation & release  (status: NOT STARTED — blocked on Phase 10)
+## Phase 11 — Hardware validation  (status: NOT STARTED — blocked on Phase 10)
 
 - Run the Phase 8 validation tooling on the ET1000: 11a `stream_demo --real`, 11b `calibration_demo
   --real`, 11c `validation_experiment --real`; record metrics in `docs/hardware_validation.md`;
-  11d capture + reconcile a **calibrated** golden frame (§2 procedure); tag **`v1.0.0`**.
+  11d capture + reconcile a **calibrated** golden frame (§2 procedure). No release tag here.
   See `docs/PHASE11_HANDOFF.md` and `docs/HUMAN_TASKS.md` (Phase 11).
+
+## Phase 12 — Backlog cleanup & release  (status: NOT STARTED — blocked on Phase 11)
+
+- Clear every **Open** item in `docs/BACKLOG.md` (move to **Done** with its commit, or defer with a
+  recorded reason), finalize `CHANGELOG.md` as a dated `## [1.0.0]`, then tag **`v1.0.0`** (CI builds +
+  attaches the wheel to the GitHub Release). See `docs/PHASE12_HANDOFF.md` and `docs/HUMAN_TASKS.md`
+  (Phase 12).

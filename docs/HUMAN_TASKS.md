@@ -211,7 +211,7 @@ Your part:
 
 ---
 
-## Phase 11 — Hardware validation & release on the ET1000 (the heavy human phase)
+## Phase 11 — Hardware validation on the ET1000 (the heavy human phase)
 
 After Phase 10 is merged, run the Phase 8 tooling on the real device. All scripts are pre-written — **you
 run commands, you do not write code.** Record evidence in `docs/hardware_validation.md` after each step.
@@ -257,10 +257,19 @@ run commands, you do not write code.** Record evidence in `docs/hardware_validat
 - [ ] **If there is a discrepancy** (different field names, unexpected structure): open a new chat with
       the agent, paste the captured frame, and ask it to apply the §2 discrepancy procedure. The agent
       will update `frames.py`, the mock, `test_frames.py`, and `REFERENCES.md`, and run CI to confirm
-      it stays green. You merge that fix PR before tagging.
+      it stays green. You merge that fix PR before moving on to Phase 12.
 
-### Tagging v1.0.0
-- [ ] Once 11a–11d are recorded and CI is green:
+---
+
+## Phase 12 — Backlog cleanup & release (mostly hands-off, then you tag)
+
+Phase 12 is an agent-driven pass that clears the minor / cosmetic items collected in `docs/BACKLOG.md`,
+then cuts the `v1.0.0` release. No hardware, no GUI. Your part:
+
+- [ ] Review & merge the Phase 12 PR once CI is green. Check the diff clears every **Open** item in
+      `docs/BACKLOG.md` (each moved to **Done** with its commit, or explicitly deferred with a recorded
+      reason), and that `CHANGELOG.md` has a dated `## [1.0.0]` section.
+- [ ] After merge, tag the release:
       ```powershell
       git tag v1.0.0
       git push origin v1.0.0
@@ -276,7 +285,7 @@ run commands, you do not write code.** Record evidence in `docs/hardware_validat
 - [ ] Confirm `docs/REPORT.md` has the phase section filled (status, evidence, deviations, hand-offs).
 - [ ] Confirm any `[TO CONFIRM ON MACHINE]` items touched by the phase are now `[CONFIRMED]` in
       `docs/REFERENCES.md`.
-- [ ] **Squash-merge.** Tag a `0.x` release if you want a checkpoint build; `1.0.0` after Phase 11.
+- [ ] **Squash-merge.** Tag a `0.x` release if you want a checkpoint build; `1.0.0` after Phase 12.
 
 ---
 

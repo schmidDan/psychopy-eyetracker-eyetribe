@@ -304,7 +304,8 @@ evidence (test output, coverage %, screenshots for `[HARDWARE]`). Squash-merge.
 **Commits.** Conventional Commits (`feat:`/`fix:`/`test:`/`docs:`/`chore:`/`refactor:`).
 
 **Versioning.** Semantic Versioning. Pre-hardware development releases are tagged `0.x`; the first
-`1.0.0` tag follows successful Phase 11 hardware validation. `CHANGELOG.md` is updated for every release tag.
+`1.0.0` tag follows successful Phase 11 hardware validation **and** the Phase 12 backlog-cleanup pass
+(`v1.0.0` is cut at the end of Phase 12). `CHANGELOG.md` is updated for every release tag.
 
 **CI (`ci.yml`) — `runs-on: windows-latest`, Python 3.10, single configuration (no matrix):**
 1. `ruff check` + `black --check` + `isort --check` — must be clean.
@@ -352,7 +353,8 @@ done. The task tracker mirrors this.
 
 Linear dependencies. Phases 0–7 are software (mock-tested). **Phase 8** (validation tooling) and
 **Phase 9** (ioHub integration fixes) are complete. **Phase 10** (post-review fixes & hardening) is
-software + CI work; **Phase 11** is the hardware-validation & release phase on the ET1000.
+software + CI work; **Phase 11** is hardware validation on the ET1000; **Phase 12** is the backlog-cleanup
+& release phase (where `v1.0.0` is tagged).
 
 ### Phase 0 — Repository scaffold & fact verification
 **Objective.** Stand up repo, tooling, CI skeleton; verify all externally-fixed facts.
@@ -663,10 +665,11 @@ in CI). Do the steps **in order**:
 **Tests.** Rewritten reconnect test; `(0,0)` validity test; broadened coverage gate satisfied; existing
 suite stays green. (The host-only `iohub` launchHubServer test is unaffected.)
 
-### Phase 11 — `[HARDWARE]` validation & release on the ET1000
+### Phase 11 — `[HARDWARE]` validation on the ET1000
 **Objective.** Run the Phase 8 validation tooling on the real ET1000 (after the Phase 9 fixes), record
-accuracy / precision / timing, capture a calibrated golden frame, reconcile, and tag the release.
-**Prerequisite.** Phase 9 merged. **Environment:** Windows + Eye Tribe Server + ET1000.
+accuracy / precision / timing, capture a calibrated golden frame, and reconcile. (The release tag is
+**not** here — it lands at the end of Phase 12.)
+**Prerequisite.** Phase 10 merged (Phase 9 before it). **Environment:** Windows + Eye Tribe Server + ET1000.
 **Steps (human-run; each produces a recorded artifact in `docs/hardware_validation.md`).**
 - **11a** `stream_demo.py --real` — gaze dot tracks the eyes (screen recording / screenshots).
 - **11b** `calibration_demo.py --real` — 9-point calibration completes; accuracy reported; redo works;
@@ -678,8 +681,25 @@ accuracy / precision / timing, capture a calibrated golden frame, reconcile, and
 **Acceptance criteria.**
 - 11a–11c run on the ET1000; metrics recorded (ET-class typical ≈ 0.5–1°); timing characterized.
 - Calibrated golden frame captured and reconciled; CI suite still green.
-- Tag **`v1.0.0`** (CI builds + attaches the wheel to the GitHub Release).
 **Tests.** Manual; evidence in `REPORT.md` + `docs/hardware_validation.md`.
+
+### Phase 12 — Backlog cleanup & release
+**Objective.** Clear the accumulated minor / cosmetic items in `docs/BACKLOG.md` in one pass, then cut
+the `v1.0.0` release. Software + CI only — no hardware.
+**Prerequisite.** Phase 11 hardware validation recorded (so the device is known-good before release).
+**Steps.**
+- **12a** Work through every **Open** item in `docs/BACKLOG.md`; for each, make the change, keep the
+  suite green, and move it to the **Done** section with its resolving commit. If an item is judged not
+  worth doing, record that decision in the backlog instead of deleting it silently.
+- **12b** Final pre-release checks: `ruff`/`black`/`isort`/`mypy` clean; full mock-based CI
+  (`-m "not hardware and not iohub"`) green; `CHANGELOG.md` finalized for `v1.0.0` (move `[Unreleased]`
+  entries under the version heading with the date).
+- **12c** Tag **`v1.0.0`** — `release.yml` builds the wheel and attaches it to the GitHub Release.
+**Acceptance criteria.**
+- `docs/BACKLOG.md` Open list is empty (every item resolved or explicitly deferred with a reason).
+- Lint/type/test all green; `CHANGELOG.md` carries a dated `v1.0.0` section.
+- `v1.0.0` tagged; GitHub Release created with the attached wheel.
+**Tests.** Whatever each backlog item requires + the full mock-based suite green.
 
 ---
 
@@ -721,14 +741,15 @@ and evidence path.
 - **Pre-Phase 0 gate:** run the smoke-socket logic to confirm the Server + ET1000 actually stream
   (done 2026-06-15). Cheapest possible de-risk of the whole effort.
 - Phases 0→…→9 are linear and complete. **Phase 10** (post-review fixes & hardening) precedes
-  **Phase 11** (hardware validation & release): full chain 0→…→9 → 10 → 11. Phase 11 runs the Phase 8
-  tooling on the ET1000.
+  **Phase 11** (hardware validation), which precedes **Phase 12** (backlog cleanup & release): full
+  chain 0→…→9 → 10 → 11 → 12. Phase 11 runs the Phase 8 tooling on the ET1000; Phase 12 clears
+  `docs/BACKLOG.md` and tags `v1.0.0`.
 
 ---
 
 ## 11. Definition of Done (project)
 
-A tagged GPL-3.0 **GitHub Release** (`v1.0.0`, end of Phase 11) with an attached wheel (no PyPI) such
+A tagged GPL-3.0 **GitHub Release** (`v1.0.0`, end of Phase 12) with an attached wheel (no PyPI) such
 that: a researcher with an ET1000 and the Eye Tribe Server on Windows installs the wheel into Standalone
 PsychoPy 2026.1.3, selects **Eye Tribe** in the Builder Eyetracker component, runs PsychoPy-driven
 9-point calibration, and records binocular **raw** gaze samples **in the experiment's display units**
