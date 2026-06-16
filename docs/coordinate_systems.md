@@ -76,24 +76,40 @@ Bounds: `(left=−1, top=1, right=1, bottom=−1)`
 | `deg` | *(monitor-calibration-dependent)* | | | | e.g. (−12.85, 7.2, 12.85, −7.2) |
 | *(no display device)* | 0 | 0 | 1920 | 1080 | Y-down pixel passthrough |
 
-### 1.6 EyeTracker wiring
+### 1.6 EyeTracker wiring (Phase 9)
 
 `EyeTracker._eyeTrackerToDisplayCoords(pixel_point)`:
-1. Calls `_get_display_bounds()` → tries `self._display_device.getBounds()`;
-   falls back to `(0, 0, screen_w, screen_h)` (Y-down pixel passthrough) when no
-   display device is available (unit-test harness, no ioHub).
-2. Calls `transforms.eyetribe_pixels_to_display(x, y, screen_w, screen_h, bounds)`.
 
-`screen_w` / `screen_h` are fetched from the Eye Tribe Server at connect
-(`screenresw` / `screenresh`) and cached as `EyeTracker._screen_w/_screen_h`
-(defaults 1920 × 1080).
+Delegates directly to the ioHub `Display` device:
 
-> **Phase 9 fix (pending):** `self._display_device.getBounds()` is **not** an ioHub Display method —
-> it raises, so the fallback above emits gaze in **raw top-left pixels**, not the experiment's display
-> units. Phase 9 replaces the override with the base `self._display_device._pixel2DisplayCoord(gaze_x,
-> gaze_y, self._display_device.getIndex())` (Eye Tribe gaze is already top-left pixels), after which
-> `transforms.py` is no longer used by the device path. Update §1.6 when Phase 9 lands. See
-> `DEVELOPMENT_PLAN.md` Phase 9 and `docs/PHASE9_HANDOFF.md`.
+```python
+self._display_device._pixel2DisplayCoord(gaze_x, gaze_y, self._display_device.getIndex())
+```
+
+Eye Tribe gaze coordinates are already in screen pixels with a top-left origin,
+which is exactly the input format expected by `_pixel2DisplayCoord`.  The Display
+device converts them to whatever unit system the experiment is using (`pix`, `norm`,
+`height`, `deg`) and handles multi-monitor index resolution.  This matches the
+base-class default implementation.
+
+Falls back to a raw pixel pass-through `(gaze_x, gaze_y)` when no Display device
+is available (unit-test harness without ioHub subprocess).
+
+`EyeTracker._displayToEyeTrackerCoords(x, y)`:
+
+```python
+self._display_device.display2PIxelCoord(x, y, self._display_device.getIndex())
+```
+
+Note the capitalisation (`PIxelCoord`), matching the spelling in the installed
+PsychoPy 2026.1.3 source.
+
+> **Pre-Phase-9 behaviour (removed):** the override called
+> `self._display_device.getBounds()`, which is not an ioHub Display method.  It
+> raised, the silent `except` returned raw top-left pixels, and gaze appeared in
+> pixel coords (0–1920) regardless of the experiment's unit setting.  Fixed in
+> Phase 9 (`psychopy_eyetracker_eyetribe/eyetribe/eyetracker.py`); `transforms.py`
+> is no longer part of the device path and has been deleted.
 
 ---
 

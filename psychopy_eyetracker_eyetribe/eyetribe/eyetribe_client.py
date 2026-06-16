@@ -355,10 +355,22 @@ class EyeTribeClient:
         t.start()
 
     def _reconnect_bg(self) -> None:
-        """Background reconnect: 3 attempts then give up."""
+        """Background reconnect: stop old threads, then retry 3 attempts."""
+        # Stop the shared stop_evt so the still-running heartbeat thread exits cleanly,
+        # then join both old threads before starting fresh ones in _connect_once.
+        self._stop_evt.set()
+        if self._reader is not None:
+            self._reader.join(timeout=2.0)
+            self._reader = None
+        if self._heartbeat is not None:
+            self._heartbeat.join(timeout=2.0)
+            self._heartbeat = None
+        # Reset the stop event so the new threads can run.
+        self._stop_evt.clear()
+
         for attempt in range(1, RECONNECT_ATTEMPTS + 1):
             time.sleep(RECONNECT_BACKOFF_S)
-            if self._stop_evt.is_set():
+            if self._stop_evt.is_set():  # close() called during reconnect
                 return
             try:
                 log.info("EyeTribeClient: reconnect attempt %d/%d", attempt, RECONNECT_ATTEMPTS)

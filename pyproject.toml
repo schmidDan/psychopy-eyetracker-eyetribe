@@ -65,7 +65,6 @@ strict = true
 files = [
   "psychopy_eyetracker_eyetribe/eyetribe/eyetribe_client.py",
   "psychopy_eyetracker_eyetribe/eyetribe/frames.py",
-  "psychopy_eyetracker_eyetribe/eyetribe/transforms.py",
   "psychopy_eyetracker_eyetribe/eyetribe/time_sync.py",
   "psychopy_eyetracker_eyetribe/eyetribe/calibration.py",
   "psychopy_eyetracker_eyetribe/mock/mock_server.py",
@@ -75,8 +74,9 @@ follow_imports = "skip"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
-  "integration: launches a real ioHub server (requires PsychoPy)",
+  "integration: drives EyeTracker directly against MockEyeTribeServer (no ioHub subprocess; runs headless in CI)",
   "hardware: manual test requiring the ET1000 + Eye Tribe Server",
+  "iohub: spawns a real ioHub subprocess + display via launchHubServer; host-only, excluded from CI",
 ]
 
 [tool.coverage.run]
