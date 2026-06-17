@@ -7,7 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/); the project 
 
 ### Fixed
 - **Reconnect test (Phase 10):** Rewrote
-  `test_stopping_heartbeats_causes_disconnect_and_reconnect` to trigger
+  `test_server_drop_triggers_reconnect_without_duplicate_threads` to trigger
   reconnect via a server-side socket drop (`MockEyeTribeServer.drop_clients()`)
   instead of manually setting `client._stop_evt`, so the real EOF→reconnect path
   is actually exercised.  Test now asserts state `CONNECTED` after reconnect and

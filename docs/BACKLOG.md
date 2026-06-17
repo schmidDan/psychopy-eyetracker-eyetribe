@@ -40,6 +40,24 @@ this is just a historical artifact — optionally add a one-line "resolved (Phas
 hardened Phase 10)" note for clarity.
 _Found: Phase 10 review._
 
+### B5 — Builder demo experiment  · nice-to-have
+
+A PsychoPy Builder (`.psyexp`) example that demonstrates the full plugin workflow in one
+file: 9-point calibration → freeview panel with live gaze dot → 9-point validation →
+heatmap overlay of gaze clusters vs target positions.
+
+Implementation notes:
+- Read an existing `.psyexp` from the installed PsychoPy (`C:\Program Files\PsychoPy\`)
+  to get the exact 2026.1.3 XML schema before generating.
+- Routines: `welcome`, `calibration`, `freeview`, `validation_intro`,
+  `validation_trial` (looped over `validation_conditions.xlsx`), `heatmap`.
+- Visual stimuli (gaze dot, target circles, heatmap blobs) via Builder Polygon components
+  or Code Components using `psychopy.visual`; no matplotlib dependency.
+- Calibration via `eyetracker.calibrate(win)` (Builder's eyetracking integration calls
+  `runSetupProcedure` automatically).
+- Save to `examples/eyetribe_demo.psyexp` + `examples/validation_conditions.xlsx`.
+_Found: Phase 11 / hardware validation session._
+
 ---
 
 ## Done

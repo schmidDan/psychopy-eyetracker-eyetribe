@@ -66,7 +66,7 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
 - Acceptance criteria:
   - PENDING — rate ±10%: test_frame_rate_within_10_percent parametrized over [10, 30] Hz
   - PENDING — heartbeat ≥30 s: test_heartbeat_keeps_link_alive_30s (sped up via short interval)
-  - PENDING — stop heartbeat → disconnect → reconnect: test_stopping_heartbeats_causes_disconnect_and_reconnect
+  - PENDING — stop heartbeat → disconnect → reconnect: test_stopping_heartbeats_causes_disconnect_and_reconnect (resolved Phase 1; hardened & renamed Phase 10/12 → test_server_drop_triggers_reconnect_without_duplicate_threads)
   - PENDING — no leaked threads/sockets: asserted in unit + conftest teardown
   - PENDING — zero PsychoPy imports: verified by module-level import test + mypy
   - PENDING — ruff/black/isort/mypy clean; pytest green; coverage ≥90%

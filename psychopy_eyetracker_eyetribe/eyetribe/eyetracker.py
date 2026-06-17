@@ -75,7 +75,7 @@ class EyeTracker(EyeTrackerDevice):
                 try:
                     self._client.connect()
                     self._fetch_screen_resolution()
-                except Exception as exc:
+                except OSError as exc:
                     log.error("EyeTracker: connect failed: %s", exc)
         else:
             self._client.close()
@@ -92,7 +92,7 @@ class EyeTracker(EyeTrackerDevice):
                 self._screen_w,
                 self._screen_h,
             )
-        except Exception as exc:
+        except (OSError, ValueError) as exc:
             log.warning(
                 "EyeTracker: could not read screen resolution, using defaults (%dx%d): %s",
                 self._screen_w,

@@ -110,7 +110,7 @@ def test_heartbeat_keeps_link_alive_30s() -> None:
 # ── heartbeat timeout → disconnect → reconnect ────────────────────────────────
 
 
-def test_stopping_heartbeats_causes_disconnect_and_reconnect() -> None:
+def test_server_drop_triggers_reconnect_without_duplicate_threads() -> None:
     """Server drops the client; EOF triggers reconnect without duplicate threads."""
     srv = MockEyeTribeServer(port=0, frame_rate=10, heartbeat_interval_ms=3000)
     srv.start()

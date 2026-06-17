@@ -180,6 +180,17 @@ class _ClientHandler(threading.Thread):
             pass
         self._conn.close()
 
+    def disconnect(self) -> None:
+        """Close the socket without setting stop_evt — simulates a server-side EOF."""
+        try:
+            self._conn.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        try:
+            self._conn.close()
+        except OSError:
+            pass
+
     # ── internal ──────────────────────────────────────────────────────────────
 
     def _send(self, obj: dict[str, Any]) -> None:
@@ -480,14 +491,7 @@ class MockEyeTribeServer:
         with self._clients_lock:
             handlers = list(self._clients)
         for handler in handlers:
-            try:
-                handler._conn.shutdown(socket.SHUT_RDWR)
-            except OSError:
-                pass
-            try:
-                handler._conn.close()
-            except OSError:
-                pass
+            handler.disconnect()
 
     # ── internal ──────────────────────────────────────────────────────────────
 

@@ -24,6 +24,10 @@ is PsychoPy-free or CI-only — no ET1000, no hardware.
    make the change, keep `ruff`/`black`/`isort`/`mypy` and the full mock-based suite green, and move the
    item to the **Done** section with its resolving commit hash. If you judge an item not worth doing,
    do **not** delete it silently — record the decision and reasoning in the backlog instead.
+   - Note for **B5** (Builder demo): before generating the `.psyexp`, read an existing
+     Builder file from `C:\Program Files\PsychoPy\lib\site-packages\psychopy\demos\builder\`
+     (or any `.psyexp` on the machine) to get the exact 2026.1.3 XML schema. Generate
+     `examples/eyetribe_demo.psyexp` + `examples/validation_conditions.xlsx`.
    - Note for **B1** (rename the misleading reconnect test): when you rename
      `test_stopping_heartbeats_causes_disconnect_and_reconnect`, also update its two references in
      `CHANGELOG.md` and `docs/REPORT.md`.
