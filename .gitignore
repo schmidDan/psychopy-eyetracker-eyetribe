@@ -15,3 +15,7 @@ htmlcov/
 *.hdf5
 calibration_result.json
 validation_results.json
+# PsychoPy Builder-generated output
+*_lastrun.py
+examples/data/
+examples/readme.md

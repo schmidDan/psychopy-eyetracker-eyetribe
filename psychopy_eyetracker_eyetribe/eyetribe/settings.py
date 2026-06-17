@@ -84,9 +84,9 @@ class EyeTribeEyetrackerBackend(_Base):  # type: ignore[misc, valid-type]
             "ioConfig[%(eyetracker)s] = {\n"
             "    'name': 'tracker',\n"
             "    'host': %(etHost)s,\n"
-            "    'port': %(etPort)s,\n"
+            "    'port': int(%(etPort)s),\n"
             "    'gaze_source': %(etGazeSource)s,\n"
-            "    'calibration': {'target_count': %(etCalibTargetCount)s},\n"
+            "    'calibration': {'target_count': int(%(etCalibTargetCount)s)},\n"
             "}\n"
         )
         buff.writeIndentedLines(code % inits)

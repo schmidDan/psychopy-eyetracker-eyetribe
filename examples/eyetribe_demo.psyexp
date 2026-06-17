@@ -1,19 +1,6 @@
-<?xml version="1.0" ?>
-<!--
-  Eye Tribe full-workflow demo for psychopy-eyetracker-eyetribe (Phase 12 / B5).
-
-  Flow: welcome → calibration (9-pt) → freeview with live gaze dot →
-        validation (9 targets from validation_conditions.xlsx) → gaze overlay.
-
-  Prerequisites:
-    - psychopy-eyetracker-eyetribe installed (pip install <wheel>).
-    - Eye Tribe Server running at 127.0.0.1:6555; ET1000 connected.
-    - Open in PsychoPy 2026.1.3 Builder.  In Experiment Settings → Eyetracking
-      confirm Host=127.0.0.1, Port=6555, Gaze source=raw, Targets=9.
--->
+﻿<?xml version="1.0" ?>
 <PsychoPy2experiment encoding="utf-8" version="2026.1.3">
   <Settings>
-    <Param val="use prefs" valType="str" updates="None" name="Audio latency priority"/>
     <Param val="use prefs" valType="str" updates="None" name="Audio lib"/>
     <Param val="" valType="str" updates="None" name="Completed URL"/>
     <Param val="auto" valType="str" updates="None" name="Data file delimiter"/>
@@ -58,20 +45,19 @@
     <Param val="False" valType="bool" updates="None" name="elSimMode"/>
     <Param val="RIGHT_EYE" valType="str" updates="None" name="elTrackEyes"/>
     <Param val="PUPIL_CR_TRACKING" valType="str" updates="None" name="elTrackingMode"/>
+    <Param val="9" valType="num" updates="None" name="etCalibTargetCount"/>
+    <Param val="raw" valType="str" updates="None" name="etGazeSource"/>
+    <Param val="127.0.0.1" valType="str" updates="None" name="etHost"/>
+    <Param val="6555" valType="num" updates="None" name="etPort"/>
     <Param val="eyetribe_demo" valType="str" updates="None" name="expName"/>
     <Param val="" valType="str" updates="None" name="expVersion"/>
     <Param val="on Sync" valType="str" updates="None" name="exportHTML"/>
-    <!-- Eye Tribe device — configure host/port in Experiment Settings > Eyetracking -->
     <Param val="eyetracker.hw.eyetribe.EyeTracker" valType="str" updates="None" name="eyetracker"/>
-    <Param val="127.0.0.1" valType="str" updates="None" name="etHost"/>
-    <Param val="6555" valType="num" updates="None" name="etPort"/>
-    <Param val="raw" valType="str" updates="None" name="etGazeSource"/>
-    <Param val="9" valType="num" updates="None" name="etCalibTargetCount"/>
     <Param val="" valType="code" updates="None" name="frameRate"/>
     <Param val="Attempting to measure frame rate of screen, please wait..." valType="str" updates="None" name="frameRateMsg"/>
     <Param val="127.0.0.1" valType="str" updates="None" name="gpAddress"/>
     <Param val="4242" valType="num" updates="None" name="gpPort"/>
-    <Param val="PsychToolbox" valType="str" updates="None" name="keyboardBackend"/>
+    <Param val="iohub" valType="str" updates="None" name="keyboardBackend"/>
     <Param val="exp" valType="code" updates="None" name="logging level"/>
     <Param val="True" valType="bool" updates="None" name="measureFrameRate"/>
     <Param val="('MIDDLE_BUTTON',)" valType="list" updates="None" name="mgBlink"/>
@@ -80,7 +66,6 @@
     <Param val="neon.local" valType="str" updates="None" name="plCompanionAddress"/>
     <Param val="8080" valType="num" updates="None" name="plCompanionPort"/>
     <Param val="0.6" valType="num" updates="None" name="plConfidenceThreshold"/>
-    <Param val="True" valType="bool" updates="None" name="plPupilCaptureRecordingEnabled"/>
     <Param val="" valType="str" updates="None" name="plPupilCaptureRecordingLocation"/>
     <Param val="127.0.0.1" valType="str" updates="None" name="plPupilRemoteAddress"/>
     <Param val="50020" valType="num" updates="None" name="plPupilRemotePort"/>
@@ -97,8 +82,6 @@
     <Param val="pyglet" valType="str" updates="None" name="winBackend"/>
   </Settings>
   <Routines>
-
-    <!-- ═══════════════════════════ welcome ═══════════════════════════ -->
     <Routine name="welcome">
       <RoutineSettingsComponent name="welcome" plugin="None">
         <Param val="none" valType="str" updates="None" name="backgroundFit"/>
@@ -161,7 +144,6 @@
       <KeyboardComponent name="key_start" plugin="None">
         <Param val="'space'" valType="list" updates="constant" name="allowedKeys"/>
         <Param val="" valType="str" updates="constant" name="correctAns"/>
-        <Param val="" valType="str" updates="None" name="deviceLabel"/>
         <Param val="False" valType="bool" updates="None" name="disabled"/>
         <Param val="True" valType="bool" updates="constant" name="discard previous"/>
         <Param val="" valType="code" updates="None" name="durationEstim"/>
@@ -179,36 +161,6 @@
         <Param val="True" valType="bool" updates="None" name="syncScreenRefresh"/>
       </KeyboardComponent>
     </Routine>
-
-    <!-- ════════════════════ calibration (built-in) ═════════════════════ -->
-    <EyetrackerCalibrationRoutine name="calibration">
-      <Param name="borderColor" updates="None" val="white" valType="color"/>
-      <Param name="borderWidth" updates="None" val="2" valType="num"/>
-      <Param name="colorSpace" updates="None" val="rgb" valType="str"/>
-      <Param name="customTarget" updates="None" val="" valType="code"/>
-      <Param name="disabled" updates="None" val="False" valType="bool"/>
-      <Param name="expandDur" updates="None" val="1" valType="num"/>
-      <Param name="expandScale" updates="None" val="1.5" valType="num"/>
-      <Param name="fillColor" updates="None" val="green" valType="color"/>
-      <Param name="innerBorderColor" updates="None" val="black" valType="color"/>
-      <Param name="innerBorderWidth" updates="None" val="2" valType="num"/>
-      <Param name="innerFillColor" updates="None" val="red" valType="color"/>
-      <Param name="innerRadius" updates="None" val="0.005" valType="num"/>
-      <Param name="movementAnimation" updates="None" val="True" valType="bool"/>
-      <Param name="movementDur" updates="None" val="1.0" valType="num"/>
-      <Param name="name" updates="None" val="calibration" valType="code"/>
-      <Param name="outerRadius" updates="None" val="0.015" valType="num"/>
-      <Param name="progressMode" updates="None" val="time" valType="str"/>
-      <Param name="randomisePos" updates="None" val="True" valType="bool"/>
-      <Param name="targetDelay" updates="None" val="1.0" valType="num"/>
-      <Param name="targetDur" updates="None" val="1.5" valType="num"/>
-      <Param name="targetLayout" updates="None" val="NINE_POINTS" valType="str"/>
-      <Param name="textColor" updates="None" val="white" valType="color"/>
-      <Param name="units" updates="None" val="from exp settings" valType="str"/>
-      <Param name="useCustom" updates="None" val="False" valType="code"/>
-    </EyetrackerCalibrationRoutine>
-
-    <!-- ═══════════════════════════ freeview ══════════════════════════ -->
     <Routine name="freeview">
       <RoutineSettingsComponent name="freeview" plugin="None">
         <Param val="none" valType="str" updates="None" name="backgroundFit"/>
@@ -236,7 +188,7 @@
         <Param val="time (s)" valType="str" updates="None" name="startType"/>
         <Param val="0.0" valType="code" updates="None" name="startVal"/>
         <Param val="duration (s)" valType="str" updates="None" name="stopType"/>
-        <Param val="" valType="code" updates="constant" name="stopVal"/>
+        <Param val="0.0" valType="code" updates="constant" name="stopVal"/>
         <Param val="False" valType="bool" updates="constant" name="stopWithRoutine"/>
         <Param val="False" valType="bool" updates="None" name="syncScreenRefresh"/>
       </EyetrackerRecordComponent>
@@ -299,7 +251,6 @@
       <KeyboardComponent name="key_freeview" plugin="None">
         <Param val="'space'" valType="list" updates="constant" name="allowedKeys"/>
         <Param val="" valType="str" updates="constant" name="correctAns"/>
-        <Param val="" valType="str" updates="None" name="deviceLabel"/>
         <Param val="False" valType="bool" updates="None" name="disabled"/>
         <Param val="True" valType="bool" updates="constant" name="discard previous"/>
         <Param val="" valType="code" updates="None" name="durationEstim"/>
@@ -317,8 +268,6 @@
         <Param val="True" valType="bool" updates="None" name="syncScreenRefresh"/>
       </KeyboardComponent>
     </Routine>
-
-    <!-- ═══════════════════════ freeview_stop ════════════════════════ -->
     <Routine name="freeview_stop">
       <RoutineSettingsComponent name="freeview_stop" plugin="None">
         <Param val="none" valType="str" updates="None" name="backgroundFit"/>
@@ -371,15 +320,13 @@
         <Param val="True" valType="bool" updates="None" name="saveStartStop"/>
         <Param val="" valType="code" updates="None" name="startEstim"/>
         <Param val="time (s)" valType="str" updates="None" name="startType"/>
-        <Param val="" valType="code" updates="None" name="startVal"/>
+        <Param val="0.0" valType="code" updates="None" name="startVal"/>
         <Param val="duration (s)" valType="str" updates="None" name="stopType"/>
         <Param val="0.5" valType="code" updates="constant" name="stopVal"/>
         <Param val="False" valType="bool" updates="constant" name="stopWithRoutine"/>
         <Param val="False" valType="bool" updates="None" name="syncScreenRefresh"/>
       </EyetrackerRecordComponent>
     </Routine>
-
-    <!-- ══════════════════════ validation_intro ══════════════════════ -->
     <Routine name="validation_intro">
       <RoutineSettingsComponent name="validation_intro" plugin="None">
         <Param val="none" valType="str" updates="None" name="backgroundFit"/>
@@ -442,7 +389,6 @@
       <KeyboardComponent name="key_val_start" plugin="None">
         <Param val="'space'" valType="list" updates="constant" name="allowedKeys"/>
         <Param val="" valType="str" updates="constant" name="correctAns"/>
-        <Param val="" valType="str" updates="None" name="deviceLabel"/>
         <Param val="False" valType="bool" updates="None" name="disabled"/>
         <Param val="True" valType="bool" updates="constant" name="discard previous"/>
         <Param val="" valType="code" updates="None" name="durationEstim"/>
@@ -460,8 +406,6 @@
         <Param val="True" valType="bool" updates="None" name="syncScreenRefresh"/>
       </KeyboardComponent>
     </Routine>
-
-    <!-- ════════════════════════════ iti ═════════════════════════════ -->
     <Routine name="iti">
       <RoutineSettingsComponent name="iti" plugin="None">
         <Param val="none" valType="str" updates="None" name="backgroundFit"/>
@@ -507,8 +451,6 @@
         <Param val="" valType="num" updates="constant" name="wrapWidth"/>
       </TextComponent>
     </Routine>
-
-    <!-- ════════════════════════ validation_trial ════════════════════ -->
     <Routine name="validation_trial">
       <RoutineSettingsComponent name="validation_trial" plugin="None">
         <Param val="none" valType="str" updates="None" name="backgroundFit"/>
@@ -526,7 +468,6 @@
         <Param val="" valType="code" updates="constant" name="stopVal"/>
         <Param val="False" valType="bool" updates="None" name="useWindowParams"/>
       </RoutineSettingsComponent>
-      <!-- Start eye-tracker recording at trial onset -->
       <EyetrackerRecordComponent name="et_trial_start" plugin="None">
         <Param val="Start Only" valType="str" updates="None" name="actionType"/>
         <Param val="False" valType="bool" updates="None" name="disabled"/>
@@ -537,11 +478,10 @@
         <Param val="time (s)" valType="str" updates="None" name="startType"/>
         <Param val="0.0" valType="code" updates="None" name="startVal"/>
         <Param val="duration (s)" valType="str" updates="None" name="stopType"/>
-        <Param val="" valType="code" updates="constant" name="stopVal"/>
+        <Param val="0.0" valType="code" updates="constant" name="stopVal"/>
         <Param val="False" valType="bool" updates="constant" name="stopWithRoutine"/>
         <Param val="False" valType="bool" updates="None" name="syncScreenRefresh"/>
       </EyetrackerRecordComponent>
-      <!-- Yellow target dot; position and label come from validation_conditions.xlsx -->
       <PolygonComponent name="target_dot" plugin="None">
         <Param val="center" valType="str" updates="constant" name="anchor"/>
         <Param val="rgb" valType="str" updates="constant" name="colorSpace"/>
@@ -571,7 +511,6 @@
         <Param val="" valType="code" updates="None" name="validator"/>
         <Param val="" valType="list" updates="constant" name="vertices"/>
       </PolygonComponent>
-      <!-- Live gaze cursor (cross) -->
       <PolygonComponent name="gaze_cursor_val" plugin="None">
         <Param val="center" valType="str" updates="constant" name="anchor"/>
         <Param val="rgb" valType="str" updates="constant" name="colorSpace"/>
@@ -601,7 +540,6 @@
         <Param val="" valType="code" updates="None" name="validator"/>
         <Param val="" valType="list" updates="constant" name="vertices"/>
       </PolygonComponent>
-      <!-- Collect gaze samples during the 2 s recording window -->
       <CodeComponent name="collect_gaze" plugin="None">
         <Param val="_et_gaze_log = []" valType="extendedCode" updates="constant" name="Before Experiment"/>
         <Param val="" valType="extendedCode" updates="constant" name="Before JS Experiment"/>
@@ -620,8 +558,6 @@
         <Param val="collect_gaze" valType="code" updates="None" name="name"/>
       </CodeComponent>
     </Routine>
-
-    <!-- ══════════════════════ validation_stop ═══════════════════════ -->
     <Routine name="validation_stop">
       <RoutineSettingsComponent name="validation_stop" plugin="None">
         <Param val="none" valType="str" updates="None" name="backgroundFit"/>
@@ -674,15 +610,13 @@
         <Param val="True" valType="bool" updates="None" name="saveStartStop"/>
         <Param val="" valType="code" updates="None" name="startEstim"/>
         <Param val="time (s)" valType="str" updates="None" name="startType"/>
-        <Param val="" valType="code" updates="None" name="startVal"/>
+        <Param val="0.0" valType="code" updates="None" name="startVal"/>
         <Param val="duration (s)" valType="str" updates="None" name="stopType"/>
         <Param val="0.5" valType="code" updates="constant" name="stopVal"/>
         <Param val="False" valType="bool" updates="constant" name="stopWithRoutine"/>
         <Param val="False" valType="bool" updates="None" name="syncScreenRefresh"/>
       </EyetrackerRecordComponent>
     </Routine>
-
-    <!-- ═══════════════════════════ heatmap ══════════════════════════ -->
     <Routine name="heatmap">
       <RoutineSettingsComponent name="heatmap" plugin="None">
         <Param val="none" valType="str" updates="None" name="backgroundFit"/>
@@ -700,7 +634,6 @@
         <Param val="" valType="code" updates="constant" name="stopVal"/>
         <Param val="False" valType="bool" updates="None" name="useWindowParams"/>
       </RoutineSettingsComponent>
-      <!-- Build overlay stims once at routine start; draw each frame -->
       <CodeComponent name="heatmap_code" plugin="None">
         <Param val="" valType="extendedCode" updates="constant" name="Before Experiment"/>
         <Param val="" valType="extendedCode" updates="constant" name="Before JS Experiment"/>
@@ -748,7 +681,6 @@
       <KeyboardComponent name="key_heatmap" plugin="None">
         <Param val="'space'" valType="list" updates="constant" name="allowedKeys"/>
         <Param val="" valType="str" updates="constant" name="correctAns"/>
-        <Param val="" valType="str" updates="None" name="deviceLabel"/>
         <Param val="False" valType="bool" updates="None" name="disabled"/>
         <Param val="True" valType="bool" updates="constant" name="discard previous"/>
         <Param val="" valType="code" updates="None" name="durationEstim"/>
@@ -766,7 +698,32 @@
         <Param val="True" valType="bool" updates="None" name="syncScreenRefresh"/>
       </KeyboardComponent>
     </Routine>
-
+    <EyetrackerCalibrationRoutine name="calibration">
+      <Param name="borderColor" updates="None" val="white" valType="color"/>
+      <Param name="borderWidth" updates="None" val="2" valType="num"/>
+      <Param name="colorSpace" updates="None" val="rgb" valType="str"/>
+      <Param name="customTarget" updates="None" val="" valType="code"/>
+      <Param name="disabled" updates="None" val="False" valType="bool"/>
+      <Param name="expandDur" updates="None" val="1" valType="num"/>
+      <Param name="expandScale" updates="None" val="1.5" valType="num"/>
+      <Param name="fillColor" updates="None" val="green" valType="color"/>
+      <Param name="innerBorderColor" updates="None" val="black" valType="color"/>
+      <Param name="innerBorderWidth" updates="None" val="2" valType="num"/>
+      <Param name="innerFillColor" updates="None" val="red" valType="color"/>
+      <Param name="innerRadius" updates="None" val="0.005" valType="num"/>
+      <Param name="movementAnimation" updates="None" val="True" valType="bool"/>
+      <Param name="movementDur" updates="None" val="1.0" valType="num"/>
+      <Param name="name" updates="None" val="calibration" valType="code"/>
+      <Param name="outerRadius" updates="None" val="0.015" valType="num"/>
+      <Param name="progressMode" updates="None" val="time" valType="str"/>
+      <Param name="randomisePos" updates="None" val="True" valType="bool"/>
+      <Param name="targetDelay" updates="None" val="1.0" valType="num"/>
+      <Param name="targetDur" updates="None" val="1.5" valType="num"/>
+      <Param name="targetLayout" updates="None" val="NINE_POINTS" valType="str"/>
+      <Param name="textColor" updates="None" val="white" valType="color"/>
+      <Param name="units" updates="None" val="from exp settings" valType="str"/>
+      <Param name="useCustom" updates="None" val="False" valType="code"/>
+    </EyetrackerCalibrationRoutine>
   </Routines>
   <Flow>
     <Routine name="welcome"/>
