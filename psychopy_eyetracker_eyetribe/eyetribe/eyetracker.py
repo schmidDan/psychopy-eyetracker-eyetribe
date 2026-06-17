@@ -75,8 +75,13 @@ class EyeTracker(EyeTrackerDevice):
                 try:
                     self._client.connect()
                     self._fetch_screen_resolution()
-                except OSError as exc:
+                except Exception as exc:
                     log.error("EyeTracker: connect failed: %s", exc)
+                    print(
+                        f"EyeTracker ERROR: could not connect to Eye Tribe Server "
+                        f"at {self._client.host}:{self._client.port} — {exc}",
+                        flush=True,
+                    )
         else:
             self._client.close()
         return self.isConnected()
@@ -185,8 +190,54 @@ class EyeTracker(EyeTrackerDevice):
         )
         win.setMouseVisible(False)
 
+        def _show_error(text: str) -> None:
+            err_stim = pp_visual.TextStim(
+                win,
+                text=text,
+                units="pix",
+                height=28,
+                color=(1, 0.3, 0.3),
+                wrapWidth=screen_w * 0.85,
+            )
+            while True:
+                err_stim.draw()
+                win.flip()
+                if pp_event.getKeys(["space", "escape"]):
+                    break
+
         try:
+            if not self.isConnected():
+                log.error(
+                    "EyeTracker: runSetupProcedure called while not connected (%s:%d)",
+                    self._client.host,
+                    self._client.port,
+                )
+                print(
+                    f"EyeTracker ERROR: not connected to Eye Tribe Server "
+                    f"at {self._client.host}:{self._client.port}",
+                    flush=True,
+                )
+                _show_error(
+                    f"Eye Tribe: not connected\n\n"
+                    f"Host: {self._client.host}   Port: {self._client.port}\n\n"
+                    "Ensure Eye Tribe Server is running, then restart the experiment.\n\n"
+                    "SPACE / ESCAPE  =  dismiss"
+                )
+                return EyeTrackerConstants.EYETRACKER_ERROR
+
             return self._run_calib_loop(win, target_count, screen_w, screen_h, pp_event, pp_visual)
+
+        except (OSError, TimeoutError) as exc:
+            log.error("EyeTracker: calibration error: %s", exc)
+            print(f"EyeTracker ERROR: calibration: {exc}", flush=True)
+            try:
+                _show_error(
+                    f"Eye Tribe: calibration error\n\n{exc}\n\n" "SPACE / ESCAPE  =  dismiss"
+                )
+            except Exception:
+                pass
+            return EyeTrackerConstants.EYETRACKER_CALIBRATION_ERROR
+
         finally:
             win.setMouseVisible(True)
             win.close()
