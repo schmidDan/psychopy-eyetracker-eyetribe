@@ -129,14 +129,7 @@ class EyeTracker(EyeTrackerDevice):
         return self._recording
 
     def enableEventReporting(self, enabled: bool = True) -> bool:
-        """Delegate to :meth:`setRecordingState` (ioHub hook).
-
-        Connects on the first enable call if not already connected.  Builder
-        2026.x never calls ``setConnectionState(True)`` explicitly — this is
-        the first opportunity to open the socket after ioHub has fully started.
-        """
-        if enabled and not self.isConnected():
-            self.setConnectionState(True)
+        """Delegate to :meth:`setRecordingState` (ioHub hook)."""
         return self.setRecordingState(enabled)
 
     # ── calibration (Phase 5) ─────────────────────────────────────────────────
@@ -175,8 +168,9 @@ class EyeTracker(EyeTrackerDevice):
             )
             target_count = DEFAULT_TARGET_COUNT
 
-        # Retry connection here in case __init__ auto-connect failed (server not
-        # yet ready at ioHub startup) but is now running.
+        # Builder 2026.x never calls setConnectionState(True) explicitly.
+        # runSetupProcedure is the first ioHub RPC that has unlimited time
+        # (calibration can take minutes), so it is the correct place to connect.
         if not self.isConnected():
             self.setConnectionState(True)
 
