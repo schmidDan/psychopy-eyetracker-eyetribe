@@ -135,7 +135,15 @@ def main() -> int:
                         break
 
                 pp_event.clearEvents()
-                sequencer.start(9)
+                # abort() clears any stuck in-progress session from a crash/redo.
+                # Do NOT call clear() here — it drops the server's gaze tracking state,
+                # causing calibration capture to collect zero valid frames.
+                sequencer.abort()
+                start_reply = sequencer.start(9)
+                if start_reply.get("statuscode", 200) != 200:
+                    msg = start_reply.get("values", {}).get("statusmessage", "unknown error")
+                    print(f"ERROR: calibration start failed ({start_reply.get('statuscode')}): {msg}")
+                    return 1
                 abort = False
                 last_calibresult_raw = None
 
@@ -182,6 +190,12 @@ def main() -> int:
                     print("Calibration aborted mid-sequence.")
                     return 1
 
+                # Real ET1000 does not embed calibresult in pointend replies —
+                # fetch it separately after the sequence completes.
+                if last_calibresult_raw is None:
+                    fetched = client.get(["calibresult"])
+                    last_calibresult_raw = fetched.get("calibresult")
+
                 # ── accuracy summary ─────────────────────────────────────────
                 if last_calibresult_raw is not None:
                     calib_result_raw = last_calibresult_raw
@@ -189,7 +203,7 @@ def main() -> int:
                     ok_str = "OK" if result.success else "FAILED"
                     lines = [f"Calibration {ok_str}  |  Overall: {result.avg_error_deg:.2f}°"]
                     for i, pt in enumerate(result.per_point, 1):
-                        ad = pt.get("ad", float("nan"))
+                        ad = pt.get("acd", {}).get("ad", float("nan"))
                         lines.append(f"  Point {i:2d}: {ad:.2f}°")
                     lines.append("\nSPACE  =  accept     R  =  redo     ESCAPE  =  abort")
                     summary = "\n".join(lines)

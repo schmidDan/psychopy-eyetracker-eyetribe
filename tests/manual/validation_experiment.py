@@ -73,8 +73,12 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--screen-w-cm", type=float, default=53.1, metavar="CM")
     p.add_argument("--screen-h-cm", type=float, default=29.9, metavar="CM")
     p.add_argument("--dist-cm", type=float, default=60.0, metavar="CM")
-    p.add_argument("--target-s", type=float, default=1.0, metavar="S")
-    p.add_argument("--iti-s", type=float, default=0.5, metavar="S")
+    p.add_argument("--settle-s", type=float, default=0.5, metavar="S",
+                   help="Settle window per target (dot shown, no recording). Default: 0.5 s.")
+    p.add_argument("--target-s", type=float, default=1.0, metavar="S",
+                   help="Recording window per target (after settle). Default: 1.0 s.")
+    p.add_argument("--iti-s", type=float, default=1.0, metavar="S",
+                   help="Inter-target interval (fixation cross). Default: 1.0 s.")
     p.add_argument(
         "--output", default="validation_results.json", metavar="PATH", help="JSON output path."
     )
@@ -85,12 +89,6 @@ def _parse_args() -> argparse.Namespace:
     )
     return p.parse_args()
 
-
-def _draw_fixation(win: object, stim: object) -> None:
-    """Draw a small cross at the screen centre (inter-target interval)."""
-    for attr in ("draw",):
-        getattr(stim, attr)()
-    getattr(win, "flip")()
 
 
 def main() -> int:  # noqa: C901
@@ -143,6 +141,7 @@ def main() -> int:  # noqa: C901
         mon_w_cm: float = args.screen_w_cm
         mon_h_cm: float = args.screen_h_cm
         dist_cm: float = args.dist_cm
+        settle_s: float = args.settle_s
         target_s: float = args.target_s
         iti_s: float = args.iti_s
 
@@ -223,13 +222,36 @@ def main() -> int:  # noqa: C901
                         mock_srv.stop()
                     return 1
 
-            # Target display period
-            client.frame_buffer.get_all()  # flush again right before onset
+            # Settle window: dot visible, saccade in progress — track latency but
+            # discard frames so saccade-flight samples don't bias accuracy.
+            client.frame_buffer.get_all()  # flush stale frames right before onset
             onset_t = time.monotonic()
             first_on_target_t: float | None = None
-            gaze_samples: list[tuple[float, float]] = []
+            settle_end = onset_t + settle_s
+            while time.monotonic() < settle_end:
+                now = time.monotonic()
+                target_dot.draw()
+                win.flip()
+                for frame in client.frame_buffer.get_all():
+                    if frame.get("state", 0) & 0x1 and first_on_target_t is None:
+                        raw = frame.get("raw", {})
+                        gx = float(raw.get("x", screen_w / 2))
+                        gy = float(raw.get("y", screen_h / 2))
+                        dx = gx - target_x_px
+                        dy = gy - target_y_px
+                        if math.hypot(dx, dy) < _ON_TARGET_RADIUS_PX:
+                            first_on_target_t = now
+                if pp_event.getKeys(["escape"]):
+                    win.setMouseVisible(True)
+                    win.close()
+                    client.close()
+                    if mock_srv:
+                        mock_srv.stop()
+                    return 1
 
-            target_end = onset_t + target_s
+            # Recording window: gaze settled on dot — collect samples.
+            gaze_samples: list[tuple[float, float]] = []
+            record_end = settle_end + target_s
             while True:
                 now = time.monotonic()
                 target_dot.draw()
@@ -249,7 +271,7 @@ def main() -> int:  # noqa: C901
                             print(f"Calibrated frame saved → {captured_frame_path}")
                             calibrated_frame_saved = True
 
-                        # Timing: first gaze within on-target radius
+                        # Timing: first gaze within on-target radius (from dot onset)
                         if first_on_target_t is None:
                             dx = gx - target_x_px
                             dy = gy - target_y_px
@@ -264,7 +286,7 @@ def main() -> int:  # noqa: C901
                         mock_srv.stop()
                     return 1
 
-                if now >= target_end:
+                if now >= record_end:
                     break
 
             # Compute per-target statistics
@@ -286,6 +308,7 @@ def main() -> int:  # noqa: C901
                     "mean_gaze_px": list(mean_gaze),
                     "n_valid_samples": len(valid),
                     "latency_s": latency_s,
+                    "samples": valid,
                 }
             )
             print(
@@ -299,51 +322,57 @@ def main() -> int:  # noqa: C901
         # ── aggregate metrics ─────────────────────────────────────────────────
         targets_px = [tuple(r["target_px"]) for r in per_target_results]
         gazes_px = [tuple(r["mean_gaze_px"]) for r in per_target_results]
-        all_valid_samples: list[tuple[float, float]] = []
-        for r in per_target_results:
-            all_valid_samples.extend(
-                (gx, gy) for gx, gy in [tuple(r["mean_gaze_px"])] if r["n_valid_samples"] > 0
-            )
         latencies = [r["latency_s"] for r in per_target_results if r["latency_s"] is not None]
 
         accuracy_deg = compute_accuracy(
             targets_px, gazes_px, screen_w, screen_h, mon_w_cm, mon_h_cm, dist_cm  # type: ignore[arg-type]
         )
-        # Precision computed per-target then averaged — here we use combined mean gazes as proxy
-        prec_deg = compute_precision(
-            gazes_px, screen_w, screen_h, mon_w_cm, mon_h_cm, dist_cm  # type: ignore[arg-type]
+        # Precision: RMS inter-sample jitter computed per target, then averaged.
+        per_target_prec = [
+            compute_precision(
+                r["samples"], screen_w, screen_h, mon_w_cm, mon_h_cm, dist_cm  # type: ignore[arg-type]
+            )
+            for r in per_target_results
+            if r["n_valid_samples"] >= 2
+        ]
+        prec_deg = (
+            sum(per_target_prec) / len(per_target_prec) if per_target_prec else float("nan")
         )
-        timing = compute_timing_stats(latencies)
+        saccade_lat = compute_timing_stats(latencies)
 
         print("\n── Validation results ─────────────────────────────────────────────")
-        print(f"  Accuracy (mean offset):  {accuracy_deg:.2f}°")
-        print(f"  Precision (RMS jitter):  {prec_deg:.2f}°")
-        print(f"  Timing — median:  {timing['median_ms']:.0f} ms")
-        print(f"  Timing — mean:    {timing['mean_ms']:.0f} ms")
-        print(f"  Timing — min/max: {timing['min_ms']:.0f} / {timing['max_ms']:.0f} ms")
+        print(f"  Accuracy (mean offset):          {accuracy_deg:.2f}°")
+        print(f"  Precision (RMS jitter):          {prec_deg:.2f}°")
+        print(f"  Saccade latency — median:  {saccade_lat['median_ms']:.0f} ms")
+        print(f"  Saccade latency — mean:    {saccade_lat['mean_ms']:.0f} ms")
+        print(f"  Saccade latency — min/max: {saccade_lat['min_ms']:.0f} / {saccade_lat['max_ms']:.0f} ms")
         print("\nMonitor: " f"{mon_w_cm:.1f}×{mon_h_cm:.1f} cm, {dist_cm:.0f} cm viewing distance")
 
         # ── save JSON ─────────────────────────────────────────────────────────
+        per_target_for_json = [
+            {k: v for k, v in r.items() if k != "samples"} for r in per_target_results
+        ]
         output = {
             "screen_px": [screen_w, screen_h],
             "monitor_cm": [mon_w_cm, mon_h_cm],
             "viewing_distance_cm": dist_cm,
             "accuracy_deg": accuracy_deg,
             "precision_deg": prec_deg,
-            "timing_ms": timing,
-            "per_target": per_target_results,
+            "saccade_latency_ms": saccade_lat,
+            "per_target": per_target_for_json,
         }
         with open(args.output, "w", encoding="utf-8") as fh:
             json.dump(output, fh, indent=2)
+
         print(f"\nResults saved → {args.output}")
 
         # ── hardware_validation.md table ──────────────────────────────────────
         print("\n── hardware_validation.md entry (paste under item 6) ─────────────")
-        print(f"| Accuracy (mean offset, °) | {accuracy_deg:.2f} |")
-        print(f"| Precision (RMS, °)        | {prec_deg:.2f} |")
-        print(f"| Timing median (ms)        | {timing['median_ms']:.0f} |")
-        print(f"| Timing mean (ms)          | {timing['mean_ms']:.0f} |")
-        print(f"| n targets                 | {len(per_target_results)} |")
+        print(f"| Accuracy (mean offset, °)       | {accuracy_deg:.2f} |")
+        print(f"| Precision (RMS, °)              | {prec_deg:.2f} |")
+        print(f"| Saccade latency median (ms)     | {saccade_lat['median_ms']:.0f} |")
+        print(f"| Saccade latency mean (ms)       | {saccade_lat['mean_ms']:.0f} |")
+        print(f"| n targets                       | {len(per_target_results)} |")
 
     finally:
         client.close()

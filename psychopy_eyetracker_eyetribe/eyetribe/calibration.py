@@ -119,12 +119,15 @@ class CalibrationSequencer:
         )
 
     def point_start(self, x_px: float, y_px: float) -> dict[str, Any]:
-        """Send ``calibration pointstart`` for the target at pixel position *(x_px, y_px)*."""
+        """Send ``calibration pointstart`` for the target at pixel position *(x_px, y_px)*.
+
+        Coordinates are cast to ``int``; the real Eye Tribe Server rejects floats with 400.
+        """
         return self._request(
             {
                 "category": "calibration",
                 "request": "pointstart",
-                "values": {"x": x_px, "y": y_px},
+                "values": {"x": int(x_px), "y": int(y_px)},
             }
         )
 

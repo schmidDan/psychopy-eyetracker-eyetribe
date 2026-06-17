@@ -676,12 +676,66 @@ Append-only; one section per phase (see DEVELOPMENT_PLAN.md section 6).
 - PASS: Stale `pyproject` comment removed.
 - PASS: `README.md` + `implementation_notes.md` document the `(0,0)` sentinel behaviour.
 
-## Phase 11 — Hardware validation  (status: NOT STARTED — blocked on Phase 10)
+## Phase 11 — Hardware validation  (status: DONE)
 
-- Run the Phase 8 validation tooling on the ET1000: 11a `stream_demo --real`, 11b `calibration_demo
-  --real`, 11c `validation_experiment --real`; record metrics in `docs/hardware_validation.md`;
-  11d capture + reconcile a **calibrated** golden frame (§2 procedure). No release tag here.
-  See `docs/PHASE11_HANDOFF.md` and `docs/HUMAN_TASKS.md` (Phase 11).
+- Date: 2026-06-17
+- Operator: Daniel Schmid
+- Device: Eye Tribe ET1000, Eye Tribe Server 0.9.77, Windows 11 Home 10.0.26200
+
+### Delivered
+
+**11a — Plugin stream (`stream_demo --real`):** PASS. White dot visibly follows gaze across
+the screen; no disconnect or crash. ESCAPE exit clean.
+
+**11b — Calibration (`calibration_demo --real`):** PASS. 9-point calibration completed;
+overall accuracy 0.18° (best run across session; range 0.15°–0.62°); `calibration_result.json`
+saved (`result: true`, `num: 9`); redo path (R key) confirmed functional.
+
+**11c — Validation experiment (`validation_experiment --real`):** PASS. All 9 targets recorded.
+
+| Metric                      | Value |
+|-----------------------------|-------|
+| Accuracy (mean offset, °)   | 1.36  |
+| Precision (RMS, °)          | 0.50  |
+| Saccade latency median (ms) | 281   |
+| Saccade latency mean (ms)   | 248   |
+| n targets                   | 9     |
+
+`validation_results.json` saved at repo root.
+
+**11d — Golden frame reconciliation:** PASS — no schema discrepancy. Both calibrated and
+uncalibrated frames carry identical field structure (`avg`, `raw`, `fix`, `state`, `time`,
+`timestamp`, per-eye `avg`/`raw`/`pcenter`/`psize`). `frames.py`, mock, and tests unchanged.
+`tests/manual/_captured_frame.json` replaced with the calibrated golden frame (state=7,
+`fix=true`, gaze near screen centre).
+
+### Hardware protocol bugs found and fixed during Phase 11
+
+All fixes are in `calibration_demo.py` and `validation_experiment.py` (manual scripts only;
+no changes to the plugin library or tests):
+
+1. **`pointstart` float coords** — real server returns 400 "Bogus value" for float pixel
+   coordinates. Fixed: `CalibrationSequencer.point_start` now casts to `int`.
+2. **`calibresult` not in `pointend` reply** — real server does not embed `calibresult` in
+   `pointend`; must be fetched via `GET calibresult` after the sequence. Fixed in
+   `calibration_demo.py`.
+3. **`calibration clear` drops tracking state** — calling `clear()` before `start()` caused
+   the server's gaze state to drop, producing `num: 0` results. Fixed: `clear()` removed from
+   the pre-`start` sequence; retained only in the redo path.
+4. **Validation saccade-flight bias** — recording samples from dot onset included saccade
+   in-flight frames, inflating accuracy error to ~27°. Fixed: 0.5 s settle window added
+   (`--settle-s`); latency tracked from onset through settle so the floor is not artificially
+   raised.
+5. **"Timing" label misleading** — renamed to "Saccade latency" throughout (measures human
+   saccade onset time, not system/hardware lag).
+
+### Acceptance criteria
+
+- PASS: 11a stream confirmed on hardware.
+- PASS: 11b calibration completed; `calibration_result.json` saved with `result: true`.
+- PASS: 11c validation metrics in ET-class typical range (accuracy 1.36°, precision 0.50°).
+- PASS: 11d schema reconciliation — no discrepancy; golden frame updated to calibrated.
+- PASS: `docs/hardware_validation.md` filled in with all results and evidence paths.
 
 ## Phase 12 — Backlog cleanup & release  (status: NOT STARTED — blocked on Phase 11)
 
