@@ -64,6 +64,7 @@ files = [
   "psychopy_eyetracker_eyetribe/eyetribe/frames.py",
   "psychopy_eyetracker_eyetribe/eyetribe/time_sync.py",
   "psychopy_eyetracker_eyetribe/eyetribe/calibration.py",
+  "psychopy_eyetracker_eyetribe/eyetribe/validation.py",
   "psychopy_eyetracker_eyetribe/mock/mock_server.py",
 ]
 follow_imports = "skip"

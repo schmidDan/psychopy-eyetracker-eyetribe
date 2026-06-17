@@ -2,7 +2,7 @@
 """ioHub device package for The Eye Tribe (namespace: ...eyetracker.hw.eyetribe).
 
 ``EyeTracker`` is exported lazily (PEP 562) so the PsychoPy-free core modules in this
-package (``eyetribe_client``, ``frames``, ``transforms``, ``time_sync``, ``calibration``)
+package (``eyetribe_client``, ``frames``, ``time_sync``, ``calibration``)
 can be imported and unit-tested without PsychoPy installed. PsychoPy is pulled in only
 when ioHub accesses ``EyeTracker`` at device-load time.
 """

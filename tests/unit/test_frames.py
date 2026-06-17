@@ -126,13 +126,13 @@ class TestCapturedFrame:
     def test_captured_frame_parses(self) -> None:
         payload = json.loads(_CAPTURED_FRAME.read_text())
         frame = parse_frame(payload)
-        assert frame.time_ms == 188928052
-        assert frame.fix is False
-        assert frame.state == 8  # STATE_TRACKING_FAIL
-        assert frame.raw == Point(x=0.0, y=0.0)
+        assert frame.time_ms == 346742012
+        assert frame.fix is True
+        assert frame.state == 7  # STATE_TRACKING_GAZE | EYES | PRESENCE
+        assert frame.raw == Point(x=916.4501, y=525.711)
         assert isinstance(frame.left, EyeData)
         assert isinstance(frame.right, EyeData)
-        assert not frame.is_gaze_valid()
+        assert frame.is_gaze_valid()
 
 
 # ── gaze() helper ─────────────────────────────────────────────────────────────

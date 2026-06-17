@@ -13,3 +13,5 @@ venv/
 htmlcov/
 *.psydat
 *.hdf5
+calibration_result.json
+validation_results.json

@@ -73,12 +73,27 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--screen-w-cm", type=float, default=53.1, metavar="CM")
     p.add_argument("--screen-h-cm", type=float, default=29.9, metavar="CM")
     p.add_argument("--dist-cm", type=float, default=60.0, metavar="CM")
-    p.add_argument("--settle-s", type=float, default=0.5, metavar="S",
-                   help="Settle window per target (dot shown, no recording). Default: 0.5 s.")
-    p.add_argument("--target-s", type=float, default=1.0, metavar="S",
-                   help="Recording window per target (after settle). Default: 1.0 s.")
-    p.add_argument("--iti-s", type=float, default=1.0, metavar="S",
-                   help="Inter-target interval (fixation cross). Default: 1.0 s.")
+    p.add_argument(
+        "--settle-s",
+        type=float,
+        default=0.5,
+        metavar="S",
+        help="Settle window per target (dot shown, no recording). Default: 0.5 s.",
+    )
+    p.add_argument(
+        "--target-s",
+        type=float,
+        default=1.0,
+        metavar="S",
+        help="Recording window per target (after settle). Default: 1.0 s.",
+    )
+    p.add_argument(
+        "--iti-s",
+        type=float,
+        default=1.0,
+        metavar="S",
+        help="Inter-target interval (fixation cross). Default: 1.0 s.",
+    )
     p.add_argument(
         "--output", default="validation_results.json", metavar="PATH", help="JSON output path."
     )
@@ -88,7 +103,6 @@ def _parse_args() -> argparse.Namespace:
         help="Save first valid calibrated frame to _captured_frame_calibrated.json.",
     )
     return p.parse_args()
-
 
 
 def main() -> int:  # noqa: C901
@@ -335,9 +349,7 @@ def main() -> int:  # noqa: C901
             for r in per_target_results
             if r["n_valid_samples"] >= 2
         ]
-        prec_deg = (
-            sum(per_target_prec) / len(per_target_prec) if per_target_prec else float("nan")
-        )
+        prec_deg = sum(per_target_prec) / len(per_target_prec) if per_target_prec else float("nan")
         saccade_lat = compute_timing_stats(latencies)
 
         print("\n── Validation results ─────────────────────────────────────────────")
@@ -345,7 +357,9 @@ def main() -> int:  # noqa: C901
         print(f"  Precision (RMS jitter):          {prec_deg:.2f}°")
         print(f"  Saccade latency — median:  {saccade_lat['median_ms']:.0f} ms")
         print(f"  Saccade latency — mean:    {saccade_lat['mean_ms']:.0f} ms")
-        print(f"  Saccade latency — min/max: {saccade_lat['min_ms']:.0f} / {saccade_lat['max_ms']:.0f} ms")
+        print(
+            f"  Saccade latency — min/max: {saccade_lat['min_ms']:.0f} / {saccade_lat['max_ms']:.0f} ms"
+        )
         print("\nMonitor: " f"{mon_w_cm:.1f}×{mon_h_cm:.1f} cm, {dist_cm:.0f} cm viewing distance")
 
         # ── save JSON ─────────────────────────────────────────────────────────

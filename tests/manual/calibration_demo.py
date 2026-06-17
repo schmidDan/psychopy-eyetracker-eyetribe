@@ -142,7 +142,9 @@ def main() -> int:
                 start_reply = sequencer.start(9)
                 if start_reply.get("statuscode", 200) != 200:
                     msg = start_reply.get("values", {}).get("statusmessage", "unknown error")
-                    print(f"ERROR: calibration start failed ({start_reply.get('statuscode')}): {msg}")
+                    print(
+                        f"ERROR: calibration start failed ({start_reply.get('statuscode')}): {msg}"
+                    )
                     return 1
                 abort = False
                 last_calibresult_raw = None

@@ -14,7 +14,7 @@ import math
 import socket
 import threading
 import time
-from typing import Any, Callable, Iterator, Optional
+from typing import Any, Callable, Optional
 
 log = logging.getLogger(__name__)
 
@@ -552,7 +552,6 @@ def linear_sweep_model(
     return _linear_sweep(x0, y0, x1, y1, period_s)
 
 
-# Expose Iterator for typing (used in tests)
 __all__ = [
     "MockEyeTribeServer",
     "GazeModel",
@@ -571,6 +570,3 @@ __all__ = [
     "DEFAULT_SCREEN_W",
     "DEFAULT_SCREEN_H",
 ]
-
-# keep Iterator import quiet if unused externally
-_ = Iterator
