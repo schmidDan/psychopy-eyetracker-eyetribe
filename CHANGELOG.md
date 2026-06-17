@@ -5,6 +5,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/); the project 
 
 ## [Unreleased]
 
+_(nothing yet)_
+
+---
+
+## [1.0.0] — 2026-06-17
+
+### Added
+- **Builder demo (Phase 12 / B5):** `examples/eyetribe_demo.psyexp` — full Builder
+  experiment (welcome → 9-pt calibration → freeview → 9-target validation → gaze
+  heatmap overlay) with companion `examples/validation_conditions.xlsx`.
+
 ### Fixed
 - **Reconnect test (Phase 10):** Rewrote
   `test_server_drop_triggers_reconnect_without_duplicate_threads` to trigger
@@ -21,6 +32,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/); the project 
   instead of a bare `except Exception`, so genuine errors in
   `_pixel2DisplayCoord` / `display2PIxelCoord` surface rather than silently
   falling back to raw pixels.
+- **`setConnectionState` / `_fetch_screen_resolution` exception narrowing (Phase 12 / B3):**
+  Both methods now catch specific network/parse exceptions (`OSError`, `ValueError`)
+  instead of a broad `except Exception`.
 
 ### Changed
 - **Coverage gate broadened (Phase 10):** CI now measures the full PsychoPy-free
