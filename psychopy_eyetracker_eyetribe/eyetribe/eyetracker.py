@@ -65,9 +65,6 @@ class EyeTracker(EyeTrackerDevice):
         self._fix_start_pupil: float = 0.0
         self._latest_sample = None
         self._latest_gaze_position = None
-        # Auto-connect on init (mirrors psychopy.iohub.devices.serial pattern).
-        # Failure is logged + printed but non-fatal; runSetupProcedure retries.
-        self.setConnectionState(True)
 
     # ── connection lifecycle ──────────────────────────────────────────────────
 
@@ -132,7 +129,14 @@ class EyeTracker(EyeTrackerDevice):
         return self._recording
 
     def enableEventReporting(self, enabled: bool = True) -> bool:
-        """Delegate to :meth:`setRecordingState` (ioHub hook)."""
+        """Delegate to :meth:`setRecordingState` (ioHub hook).
+
+        Connects on the first enable call if not already connected.  Builder
+        2026.x never calls ``setConnectionState(True)`` explicitly — this is
+        the first opportunity to open the socket after ioHub has fully started.
+        """
+        if enabled and not self.isConnected():
+            self.setConnectionState(True)
         return self.setRecordingState(enabled)
 
     # ── calibration (Phase 5) ─────────────────────────────────────────────────
