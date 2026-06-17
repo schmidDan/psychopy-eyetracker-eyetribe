@@ -65,6 +65,9 @@ class EyeTracker(EyeTrackerDevice):
         self._fix_start_pupil: float = 0.0
         self._latest_sample = None
         self._latest_gaze_position = None
+        # Auto-connect on init (mirrors psychopy.iohub.devices.serial pattern).
+        # Failure is logged + printed but non-fatal; runSetupProcedure retries.
+        self.setConnectionState(True)
 
     # ── connection lifecycle ──────────────────────────────────────────────────
 
@@ -167,6 +170,11 @@ class EyeTracker(EyeTrackerDevice):
                 DEFAULT_TARGET_COUNT,
             )
             target_count = DEFAULT_TARGET_COUNT
+
+        # Retry connection here in case __init__ auto-connect failed (server not
+        # yet ready at ioHub startup) but is now running.
+        if not self.isConnected():
+            self.setConnectionState(True)
 
         screen_w = self._screen_w
         screen_h = self._screen_h
