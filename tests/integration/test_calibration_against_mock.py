@@ -12,10 +12,16 @@ Part B — EyeTracker.runSetupProcedure with mocked PsychoPy visual layer.
 
 from __future__ import annotations
 
+import os
+import tempfile
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+# Keep accepted-calibration JSON out of the repo: runSetupProcedure saves the
+# calibresult on accept, so point it at a temp file instead of the working dir.
+_TEST_CALIB_RESULT_PATH = os.path.join(tempfile.gettempdir(), "eyetribe_test_calibration.json")
 
 pytestmark = pytest.mark.integration
 
@@ -190,7 +196,7 @@ def _make_dconfig(port: int) -> dict[str, Any]:
         "api_version": 1,
         "gaze_source": "raw",
         "runtime_settings": {"sampling_rate": "auto", "track_eyes": "BINOCULAR"},
-        "calibration": {"target_count": 9},
+        "calibration": {"target_count": 9, "result_path": _TEST_CALIB_RESULT_PATH},
         "device_timer": {"interval": 0.005},
         "monitor_event_types": [
             "BinocularEyeSampleEvent",

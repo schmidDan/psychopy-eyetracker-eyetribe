@@ -65,6 +65,8 @@ class EyeTracker(EyeTrackerDevice):
         self._fix_start_pupil: float = 0.0
         self._latest_sample = None
         self._latest_gaze_position = None
+        # Raw ``calibresult`` payload from the last accepted calibration (Phase 13).
+        self._last_calibration_raw: dict[str, Any] | None = None
         # NB: do NOT connect here.  __init__ runs while the ioHub server process is
         # still being *constructed* — before its gevent loop and the parent-process
         # death-monitor tasklet start.  A blocking connect here (up to several seconds
@@ -196,6 +198,10 @@ class EyeTracker(EyeTrackerDevice):
         # Create the calibration window *before* connecting so progress is visible on
         # screen.  The window is full-screen, so the size hint (the pre-connect default
         # resolution) is unimportant here.
+        # Match the experiment window's background by default (Builder's default is mid
+        # grey, rgb (0,0,0)) so the hand-off to/from calibration is not a jarring colour
+        # jump.  Override via the device config ``calibration.background_color``.
+        bg_color = calib_cfg.get("background_color", [0, 0, 0])
         win = pp_visual.Window(
             size=(self._screen_w, self._screen_h),
             monitor=monitor_name,
@@ -203,7 +209,7 @@ class EyeTracker(EyeTrackerDevice):
             fullscr=True,
             allowGUI=False,
             screen=screen_index,
-            color=(-1, -1, -1),
+            color=bg_color,
             colorSpace="rgb",
         )
         win.setMouseVisible(False)
@@ -464,13 +470,24 @@ class EyeTracker(EyeTrackerDevice):
                 sequencer.abort()
                 return EyeTrackerConstants.EYETRACKER_CALIBRATION_ERROR
 
+            # The real ET1000 does not embed ``calibresult`` in pointend replies —
+            # fetch it separately once the sequence completes.  (The mock embeds it
+            # per-point, so ``last_calibresult_raw`` is already set there.)
+            if last_calibresult_raw is None:
+                try:
+                    fetched = self._client.get(["calibresult"])
+                    last_calibresult_raw = fetched.get("calibresult")
+                except (OSError, TimeoutError) as exc:
+                    log.warning("EyeTracker: could not fetch calibresult: %s", exc)
+
             # ── accuracy summary ───────────────────────────────────────────────
             if last_calibresult_raw is not None:
                 result = parse_calibresult(last_calibresult_raw)
                 ok_str = "OK" if result.success else "FAILED"
                 lines = [f"Calibration {ok_str}  |  Overall: {result.avg_error_deg:.2f}°"]
                 for i, pt in enumerate(result.per_point, 1):
-                    ad = pt.get("ad", float("nan"))
+                    # Per-point angular deviation lives under "acd" → "ad".
+                    ad = pt.get("acd", {}).get("ad", pt.get("ad", float("nan")))
                     lines.append(f"  Point {i:2d}: {ad:.2f}°")
                 lines.append("\nSPACE  =  accept     R  =  redo     ESCAPE  =  abort")
                 summary = "\n".join(lines)
@@ -483,12 +500,46 @@ class EyeTracker(EyeTrackerDevice):
                 win.flip()
                 keys = get_keys(["space", "r", "escape"])
                 if "space" in keys:
+                    self._save_calibration_result(last_calibresult_raw)
                     return EyeTrackerConstants.EYETRACKER_OK
                 if "r" in keys:
                     sequencer.clear()
                     break  # restart redo loop
                 if "escape" in keys:
                     return EyeTrackerConstants.EYETRACKER_CALIBRATION_ERROR
+
+    def _save_calibration_result(self, raw: dict[str, Any] | None) -> None:
+        """Store and persist the accepted calibration result.
+
+        Keeps the raw payload on the device (``getLastCalibrationResult``) and writes
+        it to a timestamped JSON file in the working directory, so the per-session
+        calibration quality (overall + per-point angular deviation) is recorded.
+        The output path can be overridden via the device config
+        ``calibration.result_path``.  Best-effort: never raises.
+        """
+        self._last_calibration_raw = raw
+        if not raw:
+            return
+        try:
+            import json
+            import os
+
+            calib_cfg = self.getConfiguration().get("calibration", {})
+            path = calib_cfg.get("result_path")
+            if not path:
+                ts = time.strftime("%Y%m%d-%H%M%S")
+                path = os.path.join(os.getcwd(), f"eyetribe_calibration_{ts}.json")
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump(raw, fh, indent=2)
+            log.info("EyeTracker: calibration result saved → %s", path)
+            print(f"EyeTracker: calibration result saved → {path}", flush=True)
+        except Exception as exc:  # noqa: BLE001 - persistence must never break calibration
+            log.warning("EyeTracker: could not save calibration result: %s", exc)
+            print(f"EyeTracker WARNING: could not save calibration result: {exc}", flush=True)
+
+    def getLastCalibrationResult(self) -> dict[str, Any] | None:
+        """Return the raw ``calibresult`` payload from the last accepted calibration."""
+        return self._last_calibration_raw
 
     # ── polling ───────────────────────────────────────────────────────────────
 

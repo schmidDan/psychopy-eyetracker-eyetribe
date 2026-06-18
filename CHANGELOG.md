@@ -18,8 +18,36 @@ The format follows [Keep a Changelog](https://keepachangelog.com/); the project 
   creates its window and shows a "Connecting to Eye Tribe Server …" message
   before the (possibly multi-second) connect, instead of sitting on a black
   screen.
+- **Calibration result is saved + reported:** on accept, `runSetupProcedure()`
+  writes the raw `calibresult` to a timestamped JSON
+  (`eyetribe_calibration_<ts>.json`, overridable via
+  `calibration.result_path`) and keeps it on the device
+  (`getLastCalibrationResult()`).  The accept screen shows the overall + per-point
+  angular deviation in degrees.
+- **Validation accuracy & precision in the demo:** the `eyetribe_demo` heatmap
+  screen now reports spatial accuracy (mean target–gaze offset, °) and precision
+  (RMS inter-sample jitter, °) computed via
+  `psychopy_eyetracker_eyetribe.eyetribe.validation`, shown in the heatmap title
+  and saved to the experiment data (`validation_accuracy_deg`,
+  `validation_precision_deg`) and `eyetribe_validation_result.json`.
+- **Heatmap progress feedback:** the demo heatmap routine shows a
+  "Generating heatmap…" message while it builds the overlay, and caps raw-gaze
+  dots per target (`_MAX_DOTS`) so the build/redraw stays responsive.
+
+### Changed
+- **Calibration window background matches the experiment** (Builder's default mid
+  grey) instead of black, so the hand-off to/from calibration is not a jarring
+  colour jump; override via `calibration.background_color`.  (Note: a brief
+  desktop flash when the separate full-screen calibration window is created/closed
+  is inherent to ioHub's server-side calibration architecture.)
 
 ### Fixed
+- **Calibration accuracy was not captured on the real ET1000 (Phase 13):** the
+  device returns `calibresult` only in reply to a separate `get`, not embedded in
+  `pointend` replies (the mock embeds it, hiding the bug).  `runSetupProcedure()`
+  now fetches it explicitly when missing, and reads per-point angular deviation
+  from the correct nested field (`acd.ad`).  Without this the accept screen showed
+  a bare "Calibration complete" with no numbers.
 - **`PC_DEVICE_RUNTIME_ERROR` crash / unresponsive black welcome screen
   (Phase 13):** Root cause was an *orphaned ioHub server*, not gaze data.
   `EyeTracker.__init__` opened the Eye Tribe socket synchronously

@@ -15,6 +15,9 @@ htmlcov/
 *.hdf5
 calibration_result.json
 validation_results.json
+# Per-session result files written by the plugin / demo at runtime
+eyetribe_calibration_*.json
+eyetribe_validation_result.json
 # PsychoPy Builder-generated output
 *_lastrun.py
 examples/data/
