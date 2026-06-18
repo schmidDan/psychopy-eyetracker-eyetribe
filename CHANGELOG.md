@@ -55,6 +55,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/); the project 
   install dir under *Program Files* (Permission denied).  It now writes to the
   experiment directory (`psychopy.iohub.EXP_SCRIPT_DIRECTORY`, falling back to the
   user's home dir).
+- **A failed calibration can no longer be accepted:** if the tracker reports
+  `result == False` (e.g. an empty result returned after a redo), the summary
+  screen shows "FAILED — you must redo" and SPACE is ignored; only redo (R) or
+  abort (ESCAPE) proceed.  Previously SPACE accepted it, so the experiment
+  recorded gaze through a broken calibration.  Added ioHub-log lines for the
+  calibration `start` reply and the parsed result to aid diagnosing redo issues.
+- **Validation heatmap mean was driven by saccade outliers (demo):** the heatmap
+  red mean-gaze dot averaged *all* samples (including the initial saccade), while
+  the reported accuracy/precision dropped them — so the dot looked offset from the
+  numbers.  `collect_gaze` now records only after a 0.5 s settle per target, so the
+  metrics and the heatmap use the same clean, post-saccade samples.
 - **`PC_DEVICE_RUNTIME_ERROR` crash / unresponsive black welcome screen
   (Phase 13):** Root cause was an *orphaned ioHub server*, not gaze data.
   `EyeTracker.__init__` opened the Eye Tribe socket synchronously

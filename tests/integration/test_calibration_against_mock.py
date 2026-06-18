@@ -282,6 +282,31 @@ def srv_9pt():
     srv.stop()
 
 
+def test_run_setup_procedure_rejects_failed_calibration():
+    """SPACE must not accept a calibration the tracker reports as failed (result=False)."""
+    srv = MockEyeTribeServer(
+        port=0,
+        calib_result={"result": False, "deg": 0.0, "degl": 0.0, "degr": 0.0, "calibpoints": []},
+    )
+    srv.start()
+    try:
+        t = _make_tracker(srv.port)
+        t._CALIB_SETTLE_S = 0.0
+        t._CALIB_SAMPLE_S = 0.0
+        win = _mock_window()
+        pp_visual = _mock_visual(win)
+        # intro: space (start). summary: space (must be IGNORED — failed) then escape (abort).
+        get_keys = _key_sequence("space", "space", "escape")
+        result = t._run_calib_loop(win, 9, 1920, 1080, get_keys, pp_visual)
+        t._close()
+        _reset_singleton()
+        # If the failed calibration had been accepted, this would be EYETRACKER_OK.
+        assert result == EyeTrackerConstants.EYETRACKER_CALIBRATION_ERROR
+        assert t.getLastCalibrationResult() is None  # nothing was saved/accepted
+    finally:
+        srv.stop()
+
+
 def test_run_setup_procedure_success(srv_9pt):
     """runSetupProcedure accepts calibration and returns EYETRACKER_OK."""
     t = _make_tracker(srv_9pt.port)

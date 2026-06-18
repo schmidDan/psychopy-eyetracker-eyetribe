@@ -420,7 +420,9 @@ class EyeTracker(EyeTrackerDevice):
                 if "space" in keys:
                     break
 
-            sequencer.start(target_count)
+            start_reply = sequencer.start(target_count)
+            if isinstance(start_reply, dict) and start_reply.get("statuscode", 200) != 200:
+                log.warning("EyeTracker: calibration 'start' returned %s", start_reply)
 
             abort = False
             last_calibresult_raw: dict[str, Any] | None = None
@@ -481,25 +483,40 @@ class EyeTracker(EyeTrackerDevice):
                     log.warning("EyeTracker: could not fetch calibresult: %s", exc)
 
             # ── accuracy summary ───────────────────────────────────────────────
+            # A calibration that the device reports as failed (``result == False``,
+            # e.g. an empty redo result) must NOT be acceptable — otherwise the
+            # experiment records gaze through a broken/empty calibration.
             if last_calibresult_raw is not None:
                 result = parse_calibresult(last_calibresult_raw)
-                ok_str = "OK" if result.success else "FAILED"
+                calib_ok = result.success
+                log.info(
+                    "EyeTracker: calibresult success=%s points=%d overall=%.2f deg",
+                    result.success,
+                    len(result.per_point),
+                    result.avg_error_deg,
+                )
+                ok_str = "OK" if calib_ok else "FAILED"
                 lines = [f"Calibration {ok_str}  |  Overall: {result.avg_error_deg:.2f}°"]
                 for i, pt in enumerate(result.per_point, 1):
                     # Per-point angular deviation lives under "acd" → "ad".
                     ad = pt.get("acd", {}).get("ad", pt.get("ad", float("nan")))
                     lines.append(f"  Point {i:2d}: {ad:.2f}°")
-                lines.append("\nSPACE  =  accept     R  =  redo     ESCAPE  =  abort")
-                summary = "\n".join(lines)
             else:
-                summary = "Calibration complete.\n\nSPACE = accept     R = redo     ESCAPE = abort"
+                calib_ok = False
+                lines = ["Calibration FAILED — no result returned by the tracker."]
+
+            if calib_ok:
+                lines.append("\nSPACE  =  accept     R  =  redo     ESCAPE  =  abort")
+            else:
+                lines.append("\nFAILED — you must redo.   R  =  redo     ESCAPE  =  abort")
+            summary = "\n".join(lines)
 
             while True:
                 msg_stim.setText(summary)
                 msg_stim.draw()
                 win.flip()
                 keys = get_keys(["space", "r", "escape"])
-                if "space" in keys:
+                if "space" in keys and calib_ok:  # cannot accept a failed calibration
                     self._save_calibration_result(last_calibresult_raw)
                     return EyeTrackerConstants.EYETRACKER_OK
                 if "r" in keys:
