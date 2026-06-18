@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 DEFAULT_TARGET_COUNT = 9
-SUPPORTED_TARGET_COUNTS = (5, 9, 12)
+SUPPORTED_TARGET_COUNTS = (5, 9, 12, 16)
 SETTLE_MS = 750  # ms to let the participant fixate before sampling starts
 SAMPLE_MS = 1000  # ms sampling window per calibration point
 
@@ -54,6 +54,28 @@ _LAYOUTS: dict[int, tuple[tuple[float, float], ...]] = {
         (0.3, 0.3),
         (0.7, 0.3),
         (0.3, 0.7),
+    ),
+    # 4×4 grid, ordered centre-out so an early abort leaves a defined state.
+    16: (
+        # inner four (nearest centre)
+        (0.367, 0.367),
+        (0.633, 0.367),
+        (0.633, 0.633),
+        (0.367, 0.633),
+        # mid ring
+        (0.367, 0.1),
+        (0.633, 0.1),
+        (0.9, 0.367),
+        (0.9, 0.633),
+        (0.633, 0.9),
+        (0.367, 0.9),
+        (0.1, 0.633),
+        (0.1, 0.367),
+        # corners
+        (0.1, 0.1),
+        (0.9, 0.1),
+        (0.9, 0.9),
+        (0.1, 0.9),
     ),
 }
 

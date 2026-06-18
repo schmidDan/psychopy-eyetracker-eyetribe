@@ -69,8 +69,8 @@ class EyeTribeEyetrackerBackend(_Base):  # type: ignore[misc, valid-type]
             9,
             valType="num",
             inputType="choice",
-            allowedVals=[5, 9, 12],
-            hint=_translate("Number of calibration target points (5, 9, or 12)."),
+            allowedVals=[5, 9, 12, 16],
+            hint=_translate("Number of calibration target points (5, 9, 12, or 16)."),
             label=_translate("Calibration targets"),
             categ="Eyetracking",
         )

@@ -33,6 +33,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/); the project 
 - **Heatmap progress feedback:** the demo heatmap routine shows a
   "Generating heatmap…" message while it builds the overlay, and caps raw-gaze
   dots per target (`_MAX_DOTS`) so the build/redraw stays responsive.
+- **16-point calibration:** added a 4×4 (16-point) calibration layout; the
+  Builder "Calibration targets" dropdown now offers 5 / 9 / 12 / 16.
 
 ### Changed
 - **Calibration window background matches the experiment** (Builder's default mid
@@ -48,6 +50,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/); the project 
   now fetches it explicitly when missing, and reads per-point angular deviation
   from the correct nested field (`acd.ad`).  Without this the accept screen showed
   a bare "Calibration complete" with no numbers.
+- **Calibration result save location:** the saved JSON was written to
+  `os.getcwd()`, which for the ioHub *server* process is the read-only ioHub
+  install dir under *Program Files* (Permission denied).  It now writes to the
+  experiment directory (`psychopy.iohub.EXP_SCRIPT_DIRECTORY`, falling back to the
+  user's home dir).
 - **`PC_DEVICE_RUNTIME_ERROR` crash / unresponsive black welcome screen
   (Phase 13):** Root cause was an *orphaned ioHub server*, not gaze data.
   `EyeTracker.__init__` opened the Eye Tribe socket synchronously

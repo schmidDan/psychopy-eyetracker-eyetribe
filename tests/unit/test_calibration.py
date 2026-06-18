@@ -32,7 +32,7 @@ def test_default_target_count():
 
 
 def test_supported_target_counts():
-    assert SUPPORTED_TARGET_COUNTS == (5, 9, 12)
+    assert SUPPORTED_TARGET_COUNTS == (5, 9, 12, 16)
 
 
 def test_timing_constants():
@@ -333,5 +333,5 @@ def test_imports_without_psychopy():
     from psychopy_eyetracker_eyetribe.eyetribe import calibration
 
     assert calibration.DEFAULT_TARGET_COUNT == 9
-    assert calibration.SUPPORTED_TARGET_COUNTS == (5, 9, 12)
+    assert calibration.SUPPORTED_TARGET_COUNTS == (5, 9, 12, 16)
     assert callable(calibration.parse_calibresult)

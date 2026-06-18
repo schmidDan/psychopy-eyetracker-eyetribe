@@ -508,11 +508,32 @@ class EyeTracker(EyeTrackerDevice):
                 if "escape" in keys:
                     return EyeTrackerConstants.EYETRACKER_CALIBRATION_ERROR
 
+    @staticmethod
+    def _calibration_output_dir() -> str:
+        """Best writable directory for saved calibration results.
+
+        ``runSetupProcedure`` runs inside the ioHub **server** process, whose cwd is
+        the read-only ioHub install dir under *Program Files* — so ``os.getcwd()`` is
+        not writable.  Prefer the experiment script directory (the server records it as
+        ``psychopy.iohub.EXP_SCRIPT_DIRECTORY``); fall back to the user's home dir.
+        """
+        import os
+
+        try:
+            import psychopy.iohub as _ioh
+
+            d = getattr(_ioh, "EXP_SCRIPT_DIRECTORY", None)
+            if d and os.path.isdir(d) and os.access(d, os.W_OK):
+                return d
+        except Exception:
+            pass
+        return os.path.expanduser("~")
+
     def _save_calibration_result(self, raw: dict[str, Any] | None) -> None:
         """Store and persist the accepted calibration result.
 
         Keeps the raw payload on the device (``getLastCalibrationResult``) and writes
-        it to a timestamped JSON file in the working directory, so the per-session
+        it to a timestamped JSON file in the experiment directory, so the per-session
         calibration quality (overall + per-point angular deviation) is recorded.
         The output path can be overridden via the device config
         ``calibration.result_path``.  Best-effort: never raises.
@@ -528,7 +549,7 @@ class EyeTracker(EyeTrackerDevice):
             path = calib_cfg.get("result_path")
             if not path:
                 ts = time.strftime("%Y%m%d-%H%M%S")
-                path = os.path.join(os.getcwd(), f"eyetribe_calibration_{ts}.json")
+                path = os.path.join(self._calibration_output_dir(), f"eyetribe_calibration_{ts}.json")
             with open(path, "w", encoding="utf-8") as fh:
                 json.dump(raw, fh, indent=2)
             log.info("EyeTracker: calibration result saved → %s", path)
