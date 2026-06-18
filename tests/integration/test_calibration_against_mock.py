@@ -232,9 +232,18 @@ def _mock_visual(win: MagicMock) -> MagicMock:
     return pp_visual
 
 
-def _key_sequence(*keys: str) -> list[list[str]]:
-    """Build a side_effect list: each call returns the next list of keys."""
-    return [[k] for k in keys]
+def _key_sequence(*keys: str):
+    """Return a get_keys callable that emits each key in order, one per call."""
+    it = iter(keys)
+
+    def get_keys(names: list[str]) -> list[str]:
+        try:
+            k = next(it)
+        except StopIteration:
+            return []
+        return [k] if k in names else []
+
+    return get_keys
 
 
 @pytest.fixture
@@ -277,18 +286,13 @@ def test_run_setup_procedure_success(srv_9pt):
     win = _mock_window()
     pp_visual = _mock_visual(win)
 
-    # Keyboard sequence: space (start intro) → ... → space (accept summary)
-    # With 0-second timing loops, getKeys is only called in intro and summary screens.
-    pp_event = MagicMock()
-    pp_event.getKeys.side_effect = _key_sequence("space", "space")
+    # Keyboard sequence: space (start intro) → space (accept summary).
+    # With 0-second timing loops, get_keys is only called on intro and summary screens.
+    get_keys = _key_sequence("space", "space")
 
     srv_9pt.clear_calib_log()
 
-    with patch.dict("sys.modules", {"psychopy.visual": pp_visual, "psychopy.event": pp_event}):
-        with patch(
-            "psychopy_eyetracker_eyetribe.eyetribe.eyetracker.pp_visual", pp_visual, create=True
-        ):
-            result = t._run_calib_loop(win, 9, 1920, 1080, pp_event, pp_visual)
+    result = t._run_calib_loop(win, 9, 1920, 1080, get_keys, pp_visual)
     t._close()
     _reset_singleton()
 
@@ -308,11 +312,10 @@ def test_run_setup_procedure_abort_on_escape_intro(srv_9pt):
 
     win = _mock_window()
     pp_visual = _mock_visual(win)
-    pp_event = MagicMock()
-    pp_event.getKeys.return_value = ["escape"]  # always escape
+    get_keys = lambda names: ["escape"] if "escape" in names else []  # noqa: E731
 
     srv_9pt.clear_calib_log()
-    result = t._run_calib_loop(win, 9, 1920, 1080, pp_event, pp_visual)
+    result = t._run_calib_loop(win, 9, 1920, 1080, get_keys, pp_visual)
     t._close()
     _reset_singleton()
 
@@ -329,11 +332,9 @@ def test_run_setup_procedure_abort_on_escape_summary(srv_9pt):
 
     win = _mock_window()
     pp_visual = _mock_visual(win)
-    pp_event = MagicMock()
-    # space to start, then escape at summary
-    pp_event.getKeys.side_effect = _key_sequence("space", "escape")
+    get_keys = _key_sequence("space", "escape")  # space to start, escape at summary
 
-    result = t._run_calib_loop(win, 9, 1920, 1080, pp_event, pp_visual)
+    result = t._run_calib_loop(win, 9, 1920, 1080, get_keys, pp_visual)
     t._close()
     _reset_singleton()
 
@@ -348,12 +349,11 @@ def test_run_setup_procedure_redo_then_accept(srv_9pt):
 
     win = _mock_window()
     pp_visual = _mock_visual(win)
-    pp_event = MagicMock()
     # intro-start, redo-at-summary, second-intro-start, accept-at-summary
-    pp_event.getKeys.side_effect = _key_sequence("space", "r", "space", "space")
+    get_keys = _key_sequence("space", "r", "space", "space")
 
     srv_9pt.clear_calib_log()
-    result = t._run_calib_loop(win, 9, 1920, 1080, pp_event, pp_visual)
+    result = t._run_calib_loop(win, 9, 1920, 1080, get_keys, pp_visual)
     t._close()
     _reset_singleton()
 
@@ -373,20 +373,19 @@ def test_run_setup_procedure_window_closed_on_exit(srv_9pt):
 
     win = _mock_window()
     pp_visual = _mock_visual(win)
-    pp_event = MagicMock()
-    pp_event.getKeys.side_effect = _key_sequence("space", "space")
+    get_keys = _key_sequence("space", "space")
 
     # Drive _run_calib_loop directly; verify the window is NOT closed by it
     # (window close happens in runSetupProcedure's finally block, not the inner loop).
-    t._run_calib_loop(win, 9, 1920, 1080, pp_event, pp_visual)
+    t._run_calib_loop(win, 9, 1920, 1080, get_keys, pp_visual)
     win.close.assert_not_called()
 
     # Now verify runSetupProcedure closes it.  Patch at sys.modules level so the
-    # lazy imports inside the method see our mocks.
+    # lazy import inside the method sees our visual mock.  Patch _run_calib_loop so
+    # the test doesn't depend on keyboard event injection (the finally block is what
+    # matters here, not the calibration flow itself).
     import sys
 
-    pp_event2 = MagicMock()
-    pp_event2.getKeys.side_effect = _key_sequence("space", "space")
     pp_visual2 = _mock_visual(_mock_window())
     captured_win: list[MagicMock] = []
 
@@ -398,20 +397,15 @@ def test_run_setup_procedure_window_closed_on_exit(srv_9pt):
     pp_visual2.Window.side_effect = _capturing_window
 
     orig_visual = sys.modules.get("psychopy.visual")
-    orig_event = sys.modules.get("psychopy.event")
     sys.modules["psychopy.visual"] = pp_visual2  # type: ignore[assignment]
-    sys.modules["psychopy.event"] = pp_event2  # type: ignore[assignment]
     try:
-        t.runSetupProcedure()
+        with patch.object(t, "_run_calib_loop", return_value=EyeTrackerConstants.EYETRACKER_OK):
+            t.runSetupProcedure()
     finally:
         if orig_visual is not None:
             sys.modules["psychopy.visual"] = orig_visual
         else:
             sys.modules.pop("psychopy.visual", None)
-        if orig_event is not None:
-            sys.modules["psychopy.event"] = orig_event
-        else:
-            sys.modules.pop("psychopy.event", None)
         t._close()
         _reset_singleton()
 

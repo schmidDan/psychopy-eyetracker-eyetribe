@@ -65,6 +65,17 @@ class EyeTracker(EyeTrackerDevice):
         self._fix_start_pupil: float = 0.0
         self._latest_sample = None
         self._latest_gaze_position = None
+        # NB: do NOT connect here.  __init__ runs while the ioHub server process is
+        # still being *constructed* — before its gevent loop and the parent-process
+        # death-monitor tasklet start.  A blocking connect here (up to several seconds
+        # when the Eye Tribe Server is not running) freezes the experiment on a black
+        # full-screen window *and* opens a window in which, if the user force-quits the
+        # freeze, the server cannot notice the parent died and orphans itself on the
+        # fixed ioHub UDP port (9036).  A single orphan then breaks every subsequent run
+        # (port conflict -> keyboard RPC returns PC_DEVICE_RUNTIME_ERROR).  So connect
+        # lazily instead: runSetupProcedure() (calibration) and explicit
+        # setConnectionState(True) calls both run after the server is fully up, where a
+        # blocking connect is safe and any failure is reported cleanly.
 
     # ── connection lifecycle ──────────────────────────────────────────────────
 
@@ -120,6 +131,8 @@ class EyeTracker(EyeTrackerDevice):
             self._last_fix = False
         elif not recording and current:
             self._recording = False
+            self._latest_sample = None
+            self._latest_gaze_position = None
         # Directly update the ioHub reporting flag (avoids clearEvents → _iohub_server call)
         self._is_reporting_events = recording
         return recording
@@ -130,7 +143,12 @@ class EyeTracker(EyeTrackerDevice):
 
     def enableEventReporting(self, enabled: bool = True) -> bool:
         """Delegate to :meth:`setRecordingState` (ioHub hook)."""
-        return self.setRecordingState(enabled)
+        try:
+            return self.setRecordingState(enabled)
+        except Exception as exc:
+            log.error("EyeTracker.enableEventReporting: %s", exc, exc_info=True)
+            print(f"EyeTracker ERROR in enableEventReporting: {exc}", flush=True)
+            return False
 
     # ── calibration (Phase 5) ─────────────────────────────────────────────────
 
@@ -149,7 +167,7 @@ class EyeTracker(EyeTrackerDevice):
         ``EyeTrackerConstants.EYETRACKER_CALIBRATION_ERROR`` (203) on abort.
         """
         try:
-            import psychopy.event as pp_event
+            import gevent
             import psychopy.visual as pp_visual
         except ImportError:
             log.error("PsychoPy not available; cannot run calibration")
@@ -168,15 +186,6 @@ class EyeTracker(EyeTrackerDevice):
             )
             target_count = DEFAULT_TARGET_COUNT
 
-        # Builder 2026.x never calls setConnectionState(True) explicitly.
-        # runSetupProcedure is the first ioHub RPC that has unlimited time
-        # (calibration can take minutes), so it is the correct place to connect.
-        if not self.isConnected():
-            self.setConnectionState(True)
-
-        screen_w = self._screen_w
-        screen_h = self._screen_h
-
         try:
             monitor_name = self._display_device.getPsychopyMonitorName()
             screen_index = self._display_device.getIndex()
@@ -184,8 +193,11 @@ class EyeTracker(EyeTrackerDevice):
             monitor_name = "testMonitor"
             screen_index = 0
 
+        # Create the calibration window *before* connecting so progress is visible on
+        # screen.  The window is full-screen, so the size hint (the pre-connect default
+        # resolution) is unimportant here.
         win = pp_visual.Window(
-            size=(screen_w, screen_h),
+            size=(self._screen_w, self._screen_h),
             monitor=monitor_name,
             units="pix",
             fullscr=True,
@@ -195,6 +207,104 @@ class EyeTracker(EyeTrackerDevice):
             colorSpace="rgb",
         )
         win.setMouseVisible(False)
+        # Canonical ioHub pattern (BaseCalibrationProcedure line 84): flip once
+        # immediately after window creation to pump the OS message queue.
+        # Without this the window sits in Windows "not responding" state forever.
+        win.flip(clearBuffer=True)
+
+        # Connect lazily here (we deliberately do not connect in __init__; see the note
+        # there).  runSetupProcedure is a long interactive RPC that runs after the ioHub
+        # server is fully up, so a blocking connect is safe and cannot orphan the server.
+        # Connecting to a missing Eye Tribe Server blocks for a few seconds, so show a
+        # message first — otherwise the screen just sits black during the wait.
+        if not self.isConnected():
+            pp_visual.TextStim(
+                win,
+                text=(
+                    f"Connecting to Eye Tribe Server at\n"
+                    f"{self._client.host}:{self._client.port} …\n\n"
+                    "(this can take a few seconds)"
+                ),
+                units="pix",
+                height=28,
+                color=(1, 1, 1),
+                wrapWidth=self._screen_w * 0.85,
+            ).draw()
+            win.flip()
+            self.setConnectionState(True)
+
+        # Read screen size *after* connecting so the calibration layout uses the
+        # server-reported resolution (fetched during connect), not the default.
+        screen_w = self._screen_w
+        screen_h = self._screen_h
+
+        # ---- Server-side keyboard listener (canonical ioHub pattern) ----
+        # runSetupProcedure is called as a DEV_RPC handler inside the ioHub server
+        # process.  pp_event.getKeys() uses the ioHub keyboard *client*, which sends
+        # a new RPC request back to the same server — deadlock.
+        # The canonical fix (matching BaseCalibrationProcedure) is to find the
+        # server-side Keyboard device directly and register as an event listener.
+        try:
+            from psychopy.iohub.devices.keyboard import KeyboardInputEvent
+            from psychopy.iohub.constants import EventConstants as EC
+            from psychopy.iohub.devices import DeviceEvent as _DE
+
+            _key_idx = KeyboardInputEvent.CLASS_ATTRIBUTE_NAMES.index("key")
+        except Exception:
+            _key_idx = 11  # fallback index if import unavailable
+            EC = None  # type: ignore[assignment]
+            _DE = None  # type: ignore[assignment]
+
+        _pending: list[str] = []
+
+        class _KbListener:
+            """Collects KEYBOARD_RELEASE events into *_pending*."""
+
+            def _handleEvent(self_, event: Any) -> None:  # noqa: N805
+                if EC is None or _DE is None:
+                    return
+                if event[_DE.EVENT_TYPE_ID_INDEX] == EC.KEYBOARD_RELEASE:
+                    k = event[_key_idx]
+                    if isinstance(k, bytes):
+                        k = k.decode("utf-8")
+                    if k == " ":
+                        k = "space"
+                    _pending.append(k)
+
+        _kb_listener = _KbListener()
+        _kb_dev = None
+        if self._iohub_server:
+            for _dev in self._iohub_server.devices:
+                if _dev.__class__.__name__ == "Keyboard":
+                    _kb_dev = _dev
+                    try:
+                        _kb_dev._addEventListener(_kb_listener, [EC.KEYBOARD_RELEASE])
+                    except Exception:
+                        _kb_dev = None
+                    break
+
+        # _pump: yield to the gevent scheduler and (rate-limited) drain device events.
+        _last_pump: list[float] = [0.0]
+
+        def _pump() -> None:
+            gevent.sleep(0.001)  # canonical: allow gevent I/O loop to run (heartbeats, socket)
+            now = time.monotonic()
+            if now - _last_pump[0] >= 0.050 and self._iohub_server:
+                for _dm in self._iohub_server.deviceMonitors:
+                    try:
+                        _dm.device._poll()
+                    except Exception:
+                        pass
+                self._iohub_server.processDeviceEvents()
+                _last_pump[0] = now
+
+        def _get_keys(names: list[str]) -> list[str]:
+            """Pump the event loop, then return and consume any matching keys."""
+            _pump()
+            found = [k for k in names if k in _pending]
+            for k in found:
+                _pending.remove(k)
+            return found
 
         def _show_error(text: str) -> None:
             err_stim = pp_visual.TextStim(
@@ -208,7 +318,7 @@ class EyeTracker(EyeTrackerDevice):
             while True:
                 err_stim.draw()
                 win.flip()
-                if pp_event.getKeys(["space", "escape"]):
+                if _get_keys(["space", "escape"]):
                     break
 
         try:
@@ -231,7 +341,7 @@ class EyeTracker(EyeTrackerDevice):
                 )
                 return EyeTrackerConstants.EYETRACKER_ERROR
 
-            return self._run_calib_loop(win, target_count, screen_w, screen_h, pp_event, pp_visual)
+            return self._run_calib_loop(win, target_count, screen_w, screen_h, _get_keys, pp_visual)
 
         except (OSError, TimeoutError) as exc:
             log.error("EyeTracker: calibration error: %s", exc)
@@ -245,6 +355,11 @@ class EyeTracker(EyeTrackerDevice):
             return EyeTrackerConstants.EYETRACKER_CALIBRATION_ERROR
 
         finally:
+            if _kb_dev is not None:
+                try:
+                    _kb_dev._removeEventListener(_kb_listener)
+                except Exception:
+                    pass
             win.setMouseVisible(True)
             win.close()
 
@@ -254,10 +369,17 @@ class EyeTracker(EyeTrackerDevice):
         target_count: int,
         screen_w: int,
         screen_h: int,
-        pp_event: Any,
+        get_keys: Any,
         pp_visual: Any,
     ) -> Any:
-        """Inner calibration loop; separated from window creation for testability."""
+        """Inner calibration loop; separated from window creation for testability.
+
+        *get_keys(names)* must be a callable that pumps the gevent event loop,
+        then returns and consumes any pending keys whose names are in *names*.
+        This replaces ``pp_event.getKeys()`` which deadlocks when called from
+        inside the ioHub server process (a DEV_RPC handler cannot send RPCs back
+        to itself).
+        """
         from .calibration import CalibrationSequencer, parse_calibresult, point_layout
 
         settle_s = self._CALIB_SETTLE_S
@@ -286,13 +408,12 @@ class EyeTracker(EyeTrackerDevice):
             while True:
                 msg_stim.draw()
                 win.flip()
-                keys = pp_event.getKeys(["space", "escape"])
+                keys = get_keys(["space", "escape"])
                 if "escape" in keys:
                     return EyeTrackerConstants.EYETRACKER_CALIBRATION_ERROR
                 if "space" in keys:
                     break
 
-            pp_event.clearEvents()
             sequencer.start(target_count)
 
             abort = False
@@ -315,7 +436,7 @@ class EyeTracker(EyeTrackerDevice):
                     outer.draw()
                     inner.draw()
                     win.flip()
-                    if pp_event.getKeys(["escape"]):
+                    if "escape" in get_keys(["escape"]):
                         abort = True
                         break
                 if abort:
@@ -328,7 +449,7 @@ class EyeTracker(EyeTrackerDevice):
                     outer.draw()
                     inner.draw()
                     win.flip()
-                    if pp_event.getKeys(["escape"]):
+                    if "escape" in get_keys(["escape"]):
                         abort = True
                         break
 
@@ -360,7 +481,7 @@ class EyeTracker(EyeTrackerDevice):
                 msg_stim.setText(summary)
                 msg_stim.draw()
                 win.flip()
-                keys = pp_event.getKeys(["space", "r", "escape"])
+                keys = get_keys(["space", "r", "escape"])
                 if "space" in keys:
                     return EyeTrackerConstants.EYETRACKER_OK
                 if "r" in keys:
@@ -382,11 +503,14 @@ class EyeTracker(EyeTrackerDevice):
         for raw_frame in raw_frames:
             try:
                 frame = parse_frame(raw_frame)
+                self._process_frame(frame, logged_time)
             except FrameParseError as exc:
                 log.warning("EyeTracker._poll: skipping frame: %s", exc)
-                continue
-
-            self._process_frame(frame, logged_time)
+            except Exception as exc:
+                # Defensive: prevent any unexpected error from killing the ioHub
+                # monitoring tasklet (server.py _run() has no try/except around _poll).
+                log.error("EyeTracker._poll: unexpected error processing frame: %s", exc, exc_info=True)
+                print(f"EyeTracker ERROR in _poll (frame skipped): {exc}", flush=True)
 
     def _process_frame(self, frame: Frame, logged_time: float) -> None:
         """Convert one :class:`~.frames.Frame` to ioHub events and push them to the buffer."""
@@ -444,7 +568,7 @@ class EyeTracker(EyeTrackerDevice):
             frame.left.psize,
             EyeTrackerConstants.PUPIL_AREA,  # pupil_measure1, _type
             ET_UNDEFINED,
-            ET_UNDEFINED,  # pupil_measure2, _type
+            0,  # pupil_measure2_type (u1: no secondary measure)
             ET_UNDEFINED,
             ET_UNDEFINED,  # ppd_x/y
             ET_UNDEFINED,
@@ -464,7 +588,7 @@ class EyeTracker(EyeTrackerDevice):
             frame.right.psize,
             EyeTrackerConstants.PUPIL_AREA,
             ET_UNDEFINED,
-            ET_UNDEFINED,
+            0,  # pupil_measure2_type (u1: no secondary measure)
             ET_UNDEFINED,
             ET_UNDEFINED,
             ET_UNDEFINED,
@@ -522,7 +646,7 @@ class EyeTracker(EyeTrackerDevice):
                 pupil,
                 EyeTrackerConstants.PUPIL_AREA,  # pupil_measure1, _type
                 ET_UNDEFINED,
-                ET_UNDEFINED,  # pupil_measure2, _type
+                0,  # pupil_measure2_type (u1: no secondary measure)
                 ET_UNDEFINED,
                 ET_UNDEFINED,  # ppd_x/y
                 ET_UNDEFINED,
@@ -565,7 +689,7 @@ class EyeTracker(EyeTrackerDevice):
                 sp,
                 EyeTrackerConstants.PUPIL_AREA,
                 ET_UNDEFINED,
-                ET_UNDEFINED,
+                0,  # pupil_measure2_type (u1: no secondary measure)
                 ET_UNDEFINED,
                 ET_UNDEFINED,
                 ET_UNDEFINED,
@@ -582,7 +706,7 @@ class EyeTracker(EyeTrackerDevice):
                 pupil,
                 EyeTrackerConstants.PUPIL_AREA,
                 ET_UNDEFINED,
-                ET_UNDEFINED,
+                0,  # pupil_measure2_type (u1: no secondary measure)
                 ET_UNDEFINED,
                 ET_UNDEFINED,
                 ET_UNDEFINED,
@@ -599,7 +723,7 @@ class EyeTracker(EyeTrackerDevice):
                 avg_p,
                 EyeTrackerConstants.PUPIL_AREA,
                 ET_UNDEFINED,
-                ET_UNDEFINED,
+                0,  # pupil_measure2_type (u1: no secondary measure)
                 ET_UNDEFINED,
                 ET_UNDEFINED,
                 ET_UNDEFINED,

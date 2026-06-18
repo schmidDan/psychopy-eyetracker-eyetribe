@@ -50,7 +50,7 @@
     <Param val="('MIDDLE_BUTTON',)" valType="list" updates="None" name="mgBlink"/>
     <Param val="CONTINUOUS" valType="str" updates="None" name="mgMove"/>
     <Param val="0.5" valType="num" updates="None" name="mgSaccade"/>
-    <Param val="0" valType="code" updates="constant" name="runMode"/>
+    <Param val="1" valType="code" updates="constant" name="runMode"/>
     <Param val="False" valType="bool" updates="None" name="rush"/>
     <Param val="time" valType="str" updates="None" name="sortColumns"/>
     <Param val="pyglet" valType="str" updates="None" name="winBackend"/>
@@ -134,6 +134,23 @@
         <Param val="False" valType="bool" updates="constant" name="storeCorrect"/>
         <Param val="True" valType="bool" updates="None" name="syncScreenRefresh"/>
       </KeyboardComponent>
+      <CodeComponent name="clear_stale_servers" plugin="None">
+        <Param val="# Clear any orphaned ioHub server on the fixed UDP port before launchHubServer&amp;#10;from psychopy_eyetracker_eyetribe import clear_stale_servers&amp;#10;clear_stale_servers()" valType="extendedCode" updates="constant" name="Before Experiment"/>
+        <Param val="" valType="extendedCode" updates="constant" name="Before JS Experiment"/>
+        <Param val="" valType="extendedCode" updates="constant" name="Begin Experiment"/>
+        <Param val="" valType="extendedCode" updates="constant" name="Begin JS Experiment"/>
+        <Param val="" valType="extendedCode" updates="constant" name="Begin JS Routine"/>
+        <Param val="" valType="extendedCode" updates="constant" name="Begin Routine"/>
+        <Param val="Py" valType="str" updates="None" name="Code Type"/>
+        <Param val="" valType="extendedCode" updates="constant" name="Each Frame"/>
+        <Param val="" valType="extendedCode" updates="constant" name="Each JS Frame"/>
+        <Param val="" valType="extendedCode" updates="constant" name="End Experiment"/>
+        <Param val="" valType="extendedCode" updates="constant" name="End JS Experiment"/>
+        <Param val="" valType="extendedCode" updates="constant" name="End JS Routine"/>
+        <Param val="" valType="extendedCode" updates="constant" name="End Routine"/>
+        <Param val="False" valType="bool" updates="None" name="disabled"/>
+        <Param val="clear_stale_servers" valType="code" updates="None" name="name"/>
+      </CodeComponent>
     </Routine>
     <Routine name="freeview">
       <RoutineSettingsComponent name="freeview" plugin="None">
