@@ -688,8 +688,10 @@ class EyeTracker(EyeTrackerDevice):
         ]
 
         self._latest_sample = sample
-        if status == 0:
-            self._latest_gaze_position = (cgx, cgy)
+        # Report the *current* gaze position, or None when this sample is invalid
+        # (off-screen / blink / no-gaze), so consumers can hide a live gaze cursor and
+        # skip stale samples instead of freezing on the last valid point.
+        self._latest_gaze_position = (cgx, cgy) if status == 0 else None
         self._addNativeEventToBuffer(sample)
 
         self._emit_fixation_events(frame, iohub_time, logged_time, lgx, lgy, frame.left.psize)

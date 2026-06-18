@@ -35,8 +35,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/); the project 
   dots per target (`_MAX_DOTS`) so the build/redraw stays responsive.
 - **16-point calibration:** added a 4×4 (16-point) calibration layout; the
   Builder "Calibration targets" dropdown now offers 5 / 9 / 12 / 16.
+- **Gaze-loss handling in the demo:** the live gaze dot now **hides** when gaze is
+  invalid/off-screen (instead of freezing at the last point), validation records
+  only valid samples (no stale repeats), and the heatmap outcome page reports
+  **sample quality** — valid / total / invalid count and % valid — saved to the
+  experiment data (`validation_samples_total/valid/invalid`) and
+  `eyetribe_validation_result.json`.
 
 ### Changed
+- **`getPos()` / `getLastGazePosition()` report current validity:** they now return
+  `None` when the latest sample is invalid (off-screen / blink / no-gaze) instead of
+  going stale at the last valid point, so consumers can hide a live gaze cursor and
+  skip stale samples.
 - **Calibration window background matches the experiment** (Builder's default mid
   grey) instead of black, so the hand-off to/from calibration is not a jarring
   colour jump; override via `calibration.background_color`.  (Note: a brief
