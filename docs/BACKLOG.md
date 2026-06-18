@@ -12,7 +12,21 @@ change), **nice-to-have** (optional hardening).
 
 ## Open
 
-_(all items resolved — see Done section below)_
+### B6 — Calibration full-screen window hand-off shows the desktop briefly  · nice-to-have
+ioHub runs eye-tracker calibration in a *separate, server-side* full-screen window
+(`EyeTracker.runSetupProcedure`), distinct from the experiment's own window.  On the
+hand-off to/from that window the OS briefly shows the desktop ("workspace view"),
+and transient mouse events stamped with `display_id = -1` flood the ioHub datastore
+with swallowed `OverflowError`s (a PsychoPy `uint8`-column limitation).  Both are the
+same root cause and harmless (data intact).  This is inherent to the standard ioHub
+server-side calibration pattern (shared by all ioHub eye trackers), **not** specific
+to this experiment — it is a library/architecture characteristic, not a defect we
+introduced.  Already mitigated: the calibration window background matches the
+experiment (no colour jump).  Full fix would be **client-side calibration** — draw
+calibration on the experiment's existing window so there is only one window and no
+hand-off (which would also remove the mouse-event flood).  Sizeable: calibration runs
+server-side today specifically to avoid a keyboard-RPC deadlock, so the input handling
+would need reworking.
 
 ---
 
