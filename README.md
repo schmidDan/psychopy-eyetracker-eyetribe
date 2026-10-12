@@ -1,4 +1,5 @@
 # psychopy-eyetracker-eyetribe
+[![CI](https://github.com/schmidDan/psychopy-eyetracker-eyetribe/actions/workflows/ci.yml/badge.svg)](https://github.com/schmidDan/psychopy-eyetracker-eyetribe/actions/workflows/ci.yml)
 
 A native [PsychoPy](https://psychopy.org) ioHub eye-tracker plugin for **The Eye Tribe (ET1000)**.
 
