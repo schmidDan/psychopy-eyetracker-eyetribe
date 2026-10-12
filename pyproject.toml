@@ -25,7 +25,12 @@ dependencies = ["numpy"]
 
 [project.optional-dependencies]
 tests = ["psychopy", "pytest", "pytest-cov", "pyyaml"]
-dev = ["psychopy", "pytest", "pytest-cov", "pyyaml", "ruff", "black", "isort", "mypy", "pre-commit", "build"]
+# Keep ruff/black/isort pins in sync with .pre-commit-config.yaml so CI and local hooks agree.
+dev = [
+  "psychopy", "pytest", "pytest-cov", "pyyaml",
+  "ruff==0.6.9", "black==24.10.0", "isort==5.13.2",
+  "mypy", "pre-commit", "build",
+]
 
 [project.urls]
 homepage = "https://github.com/schmidDan/psychopy-eyetracker-eyetribe"

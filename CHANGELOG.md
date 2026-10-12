@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/); the project 
 ## [Unreleased]
 
 ### Fixed
+- **CI lint tool pins:** The `dev` extra now pins `ruff==0.6.9`, `black==24.10.0`
+  and `isort==5.13.2` to match `.pre-commit-config.yaml`. Previously unpinned, CI
+  picked up ruff 0.17.0, whose broader rule set failed `ruff check .` with 75
+  errors on unchanged code.
 - **Reconnect test (Phase 10):** Rewrote
   `test_stopping_heartbeats_causes_disconnect_and_reconnect` to trigger
   reconnect via a server-side socket drop (`MockEyeTribeServer.drop_clients()`)
